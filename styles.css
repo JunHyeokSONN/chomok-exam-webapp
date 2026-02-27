@@ -4,6 +4,7 @@
   --safe-right: env(safe-area-inset-right);
   --safe-bottom: env(safe-area-inset-bottom);
   --safe-left: env(safe-area-inset-left);
+  --touch-target: 44px;
   --card: #171a23;
   --text: #e5e7eb;
   --muted: #b6becb;
@@ -87,6 +88,7 @@ header p {
   align-items: center;
   gap: 0.45rem;
   padding: 0.42rem 0.5rem;
+  min-height: var(--touch-target);
   background: #121722;
   border: 1px solid #2d3440;
   border-radius: 8px;
@@ -101,7 +103,7 @@ header p {
 #singlePos {
   font-weight: 700;
   padding: 0.55rem 0.65rem;
-  min-height: 38px;
+  min-height: var(--touch-target);
   display: inline-flex;
   align-items: center;
   border-radius: 8px;
@@ -193,7 +195,7 @@ textarea {
   border: 1px solid #2d3440;
   border-radius: 8px;
   padding: 0.65rem 0.8rem;
-  min-height: 42px;
+  min-height: var(--touch-target);
   width: 100%;
   font-size: 0.95rem;
 }
@@ -221,6 +223,10 @@ textarea {
 
 .importWrap {
   padding: 0.9rem;
+}
+
+input[type="file"] {
+  min-height: var(--touch-target);
 }
 
 textarea {
@@ -298,6 +304,11 @@ ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
     padding: 0.75rem;
   }
 
+  .option {
+    min-height: var(--touch-target);
+    min-width: 0;
+  }
+
   .result,
   .importWrap {
     padding: 0.8rem;
@@ -314,7 +325,7 @@ ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
   select,
   input,
   textarea {
-    min-height: 40px;
+    min-height: var(--touch-target);
     padding: 0.55rem 0.7rem;
   }
 
@@ -322,4 +333,13 @@ ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
   #singlePos {
     width: 100%;
   }
+}
+
+.option:active,
+button:active,
+.toolbar button:active,
+select:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid #5b8cff55;
 }
