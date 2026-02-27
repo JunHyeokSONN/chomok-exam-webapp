@@ -138,6 +138,7 @@ git push -u origin main
 
 ## 실행 스크립트
 ```bash
+npm run start             # 로컬 정적 서버 실행(8000)
 npm run validate          # 문법/데이터/템플릿 체크
 npm run export-categories # 분류별 JSON/CSV 템플릿 재생성
 ```

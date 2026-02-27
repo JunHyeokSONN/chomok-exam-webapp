@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "validate": "bash scripts/validate.sh",
-    "export-categories": "node scripts/export-category-samples.js"
+    "export-categories": "node scripts/export-category-samples.js",
+    "start": "python -m http.server 8000"
   }
 }
