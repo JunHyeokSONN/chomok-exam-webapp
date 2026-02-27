@@ -313,6 +313,27 @@ function renderStats() {
   `;
 }
 
+function buildWrongMarkdownText() {
+  const items = sessionQuestions
+    .map((q, idx) => {
+      const key = qKeyFor(idx, q);
+      if (!wrongIds.has(key)) return null;
+      return `- ${q.id}: ${q.question || '문항 없음'}\n  - 정답: ${q.answer || '-'}\n  - 해설: ${q.explanation || '해설 없음'}`;
+    })
+    .filter(Boolean);
+
+  return items.join('\n\n') || '오답 없음';
+}
+
+function revealWrongPanel() {
+  const text = buildWrongMarkdownText();
+  els.wrongMarkdown.hidden = false;
+  els.wrongMarkdown.textContent = text;
+  els.wrongMarkdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  return text;
+}
+
+
 function applyGradeVisual(q, key, card, optionsWrap, isCorrect) {
   const picked = answerMeta.get(key) || '';
   if (!isCorrect) card.classList.add('graded-wrong');
@@ -561,6 +582,7 @@ function computeFinalResult({ auto = false } = {}) {
   if (auto) alert('시간 종료! 자동 채점합니다.');
   els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
   renderStats();
+  revealWrongPanel();
   els.resultBox.hidden = false;
 }
 
@@ -643,21 +665,7 @@ els.btnRetryWrong.addEventListener('click', () => {
 });
 
 els.btnCopyMarkdown.addEventListener('click', async () => {
-  const wrongList = [...wrongIds]
-    .map((key) => {
-      const idx = parseInt(String(key).replace(/^q_/, ''), 10);
-      const q = Number.isInteger(idx)
-        ? sessionQuestions[idx]
-        : allQuestions.find((x) => x.id === key);
-      if (!q) return null;
-      return `- ${q.id}: ${q.question}\n  - 정답: ${q.answer}`;
-    })
-    .filter(Boolean)
-    .join('\n\n');
-
-  const text = wrongList || '오답 없음';
-  els.wrongMarkdown.hidden = false;
-  els.wrongMarkdown.textContent = text;
+  const text = revealWrongPanel();
   try {
     await navigator.clipboard.writeText(text);
     alert('오답 내역 복사 완료');
