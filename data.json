@@ -1,0 +1,39 @@
+{
+  "questions": [
+    {
+      "id": "Q1",
+      "question": "토목공학에서 하중이용도 계수로 가장 적절한 것은?",
+      "type": "multiple",
+      "options": ["1.0", "1.2", "0.7", "2.0"],
+      "answer": "1.2",
+      "explanation": "일반적으로 항복 한계 대비 설계하중 산정 시 사용되는 기본 계수는 1.2를 많이 사용한다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "Q2",
+      "question": "콘크리트의 압축강도는 보통 어떤 단위로 표시하는가?",
+      "type": "multiple",
+      "options": ["kgf/cm2", "N/m2", "kgf/m2", "Pa"],
+      "answer": "kgf/cm2",
+      "explanation": "실무에서는 MPa(=N/mm2)로 많이 쓰지만, 과거 시험/교재에서는 kgf/cm2 표현이 병기되기도 함.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "Q3",
+      "question": "포화토의 공극수율이 증가하면 투수성은 보통 감소한다.",
+      "type": "truefalse",
+      "options": ["참", "거짓"],
+      "answer": "참",
+      "explanation": "입자구조와 물공극 특성에 따라 다르지만 일반적 시험문제는 참/거짓 형태로 구성됨.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "Q4",
+      "question": "다짐압축시험에서 오일러의 안정계수 조건을 한 줄로 설명하시오.",
+      "type": "short",
+      "answer": "하중 경로를 따라 안전율이 1 이상이어야 한다.",
+      "explanation": "시험 목적상 핵심은 구조의 안정성 보장 조건의 기술이며, 오일러 안정개념과 혼동 없이 기술.",
+      "difficulty": "hard"
+    }
+  ]
+}

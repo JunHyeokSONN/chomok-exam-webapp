@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>초목기사 기출문제</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>초목기사 기출문제</h1>
+        <p>문제 풀이 + 채점 + 오답 복기</p>
+      </header>
+
+      <section class="toolbar">
+        <label>
+          모드:
+          <select id="modeSelect">
+            <option value="learn">학습 모드</option>
+            <option value="test">시험 모드</option>
+          </select>
+        </label>
+        <label>
+          난이도:
+          <select id="difficultySelect">
+            <option value="all">전체</option>
+            <option value="easy">하</option>
+            <option value="normal">중</option>
+            <option value="hard">상</option>
+          </select>
+        </label>
+        <button id="btnShuffle">랜덤 섞기</button>
+        <button id="btnReset">초기화</button>
+        <span id="status">문항 0 / 0</span>
+      </section>
+
+      <main id="quizArea">로딩 중...</main>
+
+      <section class="result" id="resultBox" hidden>
+        <h2>결과</h2>
+        <p id="scoreText"></p>
+        <button id="btnRetryWrong">오답만 다시 풀기</button>
+        <button id="btnCopyMarkdown">오답 내역 마크다운 복사</button>
+        <pre id="wrongMarkdown" hidden></pre>
+      </section>
+
+      <section class="importWrap">
+        <h3>문제 임포트</h3>
+        <textarea id="jsonInput" rows="6" placeholder='[{"id":"Q1","question":"질문","type":"multiple","options":["1","2","3","4"],"answer":"1","explanation":"해설","difficulty":"normal"}]'></textarea>
+        <div>
+          <button id="btnLoadJson">JSON으로 덮어쓰기</button>
+          <button id="btnSaveToLocal">현재 문제 저장</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

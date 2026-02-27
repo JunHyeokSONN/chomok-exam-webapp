@@ -1,0 +1,67 @@
+:root {
+  --bg: #0f1117;
+  --card: #171a23;
+  --text: #e5e7eb;
+  --accent: #5b8cff;
+  --ok: #3fb950;
+  --bad: #ff4d4f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "맑은 고딕", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+header { margin-bottom: 14px; }
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto auto;
+  gap: 8px; align-items: center;
+  background: #11131a;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+button, select, textarea {
+  background: #1f2430;
+  color: #fff;
+  border: 1px solid #2d3440;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+#quizArea {
+  display: grid;
+  gap: 12px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid #2a2f3a;
+  border-radius: 12px;
+  padding: 14px;
+}
+.options { display: grid; gap: 8px; margin-top: 10px; }
+.option {
+  padding: 10px;
+  border: 1px solid #2d3440;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px #5b8cff55 inset; }
+.option.correct { border-color: var(--ok); background: #1f3a28; }
+.option.wrong { border-color: var(--bad); background: #3b1f24; }
+footerAction { display:flex; gap:8px; }
+.actions { display:flex; gap: 8px; margin-top: 12px; }
+.actions button { cursor:pointer; }
+.meta { opacity: .8; font-size: 13px; }
+.result { margin-top: 14px; background: #10131a; border:1px solid #2a2f3a; border-radius: 12px; padding: 14px; }
+.importWrap { margin-top: 14px; background: #11131a; border: 1px solid #2a2f3a; border-radius: 12px; padding: 12px; }
+textarea { width: 100%; margin-top: 8px; }
+pre { background: #0d1117; padding: 10px; border-radius: 10px; overflow: auto; }
+.okText { color: var(--ok); }
+.badText { color: var(--bad); }
+@media (max-width: 680px) {
+  .toolbar { grid-template-columns: 1fr 1fr; }
+  .toolbar #status { grid-column: 1 / -1; }
+}
