@@ -41,3 +41,11 @@
 - GitHub 저장소의 Settings > Pages > Deploy from a branch
 - Branch: `main`, folder: `/ (root)`
 
+
+
+## 이번 확장 업데이트(요약)
+- 한문항씩 보기/전체 보기 전환
+- 시험 모드 타이머(분 단위) 및 시험 종료 처리
+- 난이도/표시개수 필터
+- JSON 파일 업로드(로컬 파일 선택)
+- 로컬 백업 저장/복원 및 오답 내역 마크다운 복사

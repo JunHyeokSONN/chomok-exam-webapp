@@ -13,23 +13,48 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
 header { margin-bottom: 14px; }
 .toolbar {
   display: grid;
-  grid-template-columns: 1fr 1fr auto auto auto;
-  gap: 8px; align-items: center;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
   background: #11131a;
   padding: 10px;
   border-radius: 12px;
   margin-bottom: 12px;
 }
-button, select, textarea {
+.toolbar label, .toolbar button, .toolbar input, .toolbar select {
+  width: 100%;
+}
+button, select, input, textarea {
   background: #1f2430;
   color: #fff;
   border: 1px solid #2d3440;
   border-radius: 8px;
   padding: 8px 10px;
+}
+#status, #singlePos { font-weight: 700; padding: 8px 10px; }
+.timerPanel {
+  background: #141822;
+  border: 1px solid #2d3440;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.singleNav {
+  background: #141822;
+  border: 1px solid #2d3440;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 #quizArea {
   display: grid;
@@ -47,21 +72,22 @@ button, select, textarea {
   border: 1px solid #2d3440;
   border-radius: 8px;
   cursor: pointer;
+  text-align: left;
 }
 .option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px #5b8cff55 inset; }
 .option.correct { border-color: var(--ok); background: #1f3a28; }
 .option.wrong { border-color: var(--bad); background: #3b1f24; }
-footerAction { display:flex; gap:8px; }
-.actions { display:flex; gap: 8px; margin-top: 12px; }
-.actions button { cursor:pointer; }
-.meta { opacity: .8; font-size: 13px; }
-.result { margin-top: 14px; background: #10131a; border:1px solid #2a2f3a; border-radius: 12px; padding: 14px; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+.result { margin-top: 14px; background: #10131a; border: 1px solid #2a2f3a; border-radius: 12px; padding: 14px; }
 .importWrap { margin-top: 14px; background: #11131a; border: 1px solid #2a2f3a; border-radius: 12px; padding: 12px; }
 textarea { width: 100%; margin-top: 8px; }
 pre { background: #0d1117; padding: 10px; border-radius: 10px; overflow: auto; }
 .okText { color: var(--ok); }
 .badText { color: var(--bad); }
-@media (max-width: 680px) {
-  .toolbar { grid-template-columns: 1fr 1fr; }
-  .toolbar #status { grid-column: 1 / -1; }
+ul { margin: 6px 0 0 0; padding-left: 18px; }
+
+@media (min-width: 768px) {
+  .toolbar {
+    grid-template-columns: repeat(5, 1fr) auto auto auto;
+  }
 }

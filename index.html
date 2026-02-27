@@ -10,7 +10,7 @@
     <div class="wrap">
       <header>
         <h1>초목기사 기출문제</h1>
-        <p>문제 풀이 + 채점 + 오답 복기</p>
+        <p>문제 풀이 + 채점 + 오답 복기 + 타이머</p>
       </header>
 
       <section class="toolbar">
@@ -30,27 +30,60 @@
             <option value="hard">상</option>
           </select>
         </label>
+        <label>
+          보기 방식:
+          <select id="viewMode">
+            <option value="all">전체 보기</option>
+            <option value="single">한문항씩</option>
+          </select>
+        </label>
+        <label>
+          표시 개수:
+          <input id="maxCount" type="number" min="1" value="" placeholder="전체" />
+        </label>
+        <label>
+          시험시간(분):
+          <input id="timeLimitMin" type="number" min="1" value="20" />
+        </label>
+        <button id="btnStartTest">시험 시작</button>
         <button id="btnShuffle">랜덤 섞기</button>
         <button id="btnReset">초기화</button>
         <span id="status">문항 0 / 0</span>
       </section>
+
+      <section id="timerPanel" class="timerPanel" hidden>
+        <strong>남은 시간:</strong>
+        <span id="timerText">--:--</span>
+        <button id="btnFinishTest">시험 종료</button>
+      </section>
+
+      <nav id="singleNav" class="singleNav" hidden>
+        <button id="btnPrev">이전</button>
+        <span id="singlePos">-</span>
+        <button id="btnNext">다음</button>
+      </nav>
 
       <main id="quizArea">로딩 중...</main>
 
       <section class="result" id="resultBox" hidden>
         <h2>결과</h2>
         <p id="scoreText"></p>
-        <button id="btnRetryWrong">오답만 다시 풀기</button>
-        <button id="btnCopyMarkdown">오답 내역 마크다운 복사</button>
+        <div id="statsByDiff"></div>
+        <div class="actions">
+          <button id="btnRetryWrong">오답만 다시 풀기</button>
+          <button id="btnCopyMarkdown">오답 내역 마크다운 복사</button>
+        </div>
         <pre id="wrongMarkdown" hidden></pre>
       </section>
 
       <section class="importWrap">
-        <h3>문제 임포트</h3>
+        <h3>문제 임포트/관리</h3>
         <textarea id="jsonInput" rows="6" placeholder='[{"id":"Q1","question":"질문","type":"multiple","options":["1","2","3","4"],"answer":"1","explanation":"해설","difficulty":"normal"}]'></textarea>
-        <div>
+        <div class="actions">
           <button id="btnLoadJson">JSON으로 덮어쓰기</button>
+          <input type="file" id="fileJson" accept="application/json" />
           <button id="btnSaveToLocal">현재 문제 저장</button>
+          <button id="btnClearLocal">로컬 백업 삭제</button>
         </div>
       </section>
     </div>
