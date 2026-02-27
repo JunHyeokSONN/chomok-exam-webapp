@@ -27,6 +27,15 @@ header { margin-bottom: 14px; }
 .toolbar label, .toolbar button, .toolbar input, .toolbar select {
   width: 100%;
 }
+.toolbar .inline-check {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.toolbar .inline-check input {
+  width: auto;
+}
 button, select, input, textarea {
   background: #1f2430;
   color: #fff;
@@ -89,5 +98,8 @@ ul { margin: 6px 0 0 0; padding-left: 18px; }
 @media (min-width: 768px) {
   .toolbar {
     grid-template-columns: repeat(5, 1fr) auto auto auto;
+  }
+  .toolbar .inline-check {
+    grid-column: auto;
   }
 }
