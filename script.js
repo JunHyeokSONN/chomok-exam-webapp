@@ -87,14 +87,30 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+function toHalfWidth(raw) {
+  return String(raw).replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => {
+    const n = ch.charCodeAt(0);
+    if (n >= 0xff10 && n <= 0xff19) return String.fromCharCode(n - 0xfee0);
+    if (n >= 0xff21 && n <= 0xff3a) return String.fromCharCode(n - 0xfee0);
+    if (n >= 0xff41 && n <= 0xff5a) return String.fromCharCode(n - 0xfee0);
+    return ch;
+  });
+}
+
 function canonicalize(raw) {
-  return String(raw || '')
-    .toLowerCase()
+  const rawText = String(raw || '').normalize('NFKC').toLowerCase();
+
+  return toHalfWidth(rawText)
+    .replace(/[−–—]/g, '-')
+    .replace(/×/g, '*')
+    .replace(/÷/g, '/')
     .replace(/\s+/g, '')
     .replace(/,/g, '')
     .replace(/\(.*?\)/g, '$1')
     .replace(/\s*[*/]\s*/g, '/')
-    .replace(/kgf\/cm2|kgfcm2/g, 'kgfcm2');
+    .replace(/kgf\/?cm2|kgfcm2/g, 'kgfcm2')
+    .replace(/kpa\/?m2|kpa\/m2|kpacm2/g, 'kpa/m2')
+    .replace(/㎠/g, 'cm2');
 }
 
 function normalize(raw) {
@@ -318,7 +334,8 @@ function buildWrongMarkdownText() {
     .map((q, idx) => {
       const key = qKeyFor(idx, q);
       if (!wrongIds.has(key)) return null;
-      return `- ${q.id}: ${q.question || '문항 없음'}\n  - 정답: ${q.answer || '-'}\n  - 해설: ${q.explanation || '해설 없음'}`;
+      const user = answerMeta.get(key) || '-';
+      return `- ${q.id}: ${q.question || '문항 없음'}\n  - 난이도: ${q.difficulty || '-'}\n  - 내 답안: ${user}\n  - 정답: ${q.answer || '-'}\n  - 해설: ${q.explanation || '해설 없음'}`;
     })
     .filter(Boolean);
 
