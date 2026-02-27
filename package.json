@@ -1,0 +1,9 @@
+{
+  "name": "chomok-exam-webapp",
+  "version": "1.0.1",
+  "private": true,
+  "scripts": {
+    "validate": "bash scripts/validate.sh",
+    "export-categories": "node scripts/export-category-samples.js"
+  }
+}

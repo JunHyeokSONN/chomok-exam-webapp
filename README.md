@@ -135,6 +135,13 @@ git push -u origin main
   - 동일한 `*.csv`, `*.template.json`
 - 템플릿 파일은 신규 문제 추가 시 스키마 복사에 사용하세요.
 
+
+## 실행 스크립트
+```bash
+npm run validate          # 문법/데이터/템플릿 체크
+npm run export-categories # 분류별 JSON/CSV 템플릿 재생성
+```
+
 ## 마무리 체크
 - `http://127.0.0.1:8000/index.html` 응답 확인
 - 채점/복기/복사 동작 확인
