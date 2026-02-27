@@ -2,6 +2,7 @@ const PRESETS = {
   quick: {
     label: '빠른 체크 (20분/15문/중)',
     mode: 'test',
+    examCategory: 'all',
     difficulty: 'normal',
     viewMode: 'single',
     maxCount: 15,
@@ -11,6 +12,7 @@ const PRESETS = {
   exam: {
     label: '본시험 모의 (40분/40문/전체)',
     mode: 'test',
+    examCategory: 'all',
     difficulty: 'all',
     viewMode: 'single',
     maxCount: 40,
@@ -20,6 +22,7 @@ const PRESETS = {
   study: {
     label: '학습 루틴 (전체/무제한/학습)',
     mode: 'learn',
+    examCategory: 'all',
     difficulty: 'all',
     viewMode: 'all',
     maxCount: '',
@@ -32,6 +35,7 @@ const els = {
   presetSelect: document.getElementById('presetSelect'),
   btnApplyPreset: document.getElementById('btnApplyPreset'),
   modeSelect: document.getElementById('modeSelect'),
+  examCategory: document.getElementById('examCategory'),
   difficultySelect: document.getElementById('difficultySelect'),
   viewMode: document.getElementById('viewMode'),
   maxCount: document.getElementById('maxCount'),
@@ -134,6 +138,7 @@ function sanitizeQuestions(items) {
     }
     seen.add(id);
     q.id = id;
+    if (!q.category) q.category = '토목기사';
     fixed.push(q);
   });
 
@@ -160,6 +165,7 @@ function fillPresetOptions() {
 function getPresetFromUI() {
   return {
     mode: els.modeSelect.value,
+    examCategory: els.examCategory.value,
     difficulty: els.difficultySelect.value,
     viewMode: els.viewMode.value,
     maxCount: els.maxCount.value,
@@ -172,6 +178,7 @@ function applyPreset(key) {
   const p = PRESETS[key];
   if (!p) return;
   els.modeSelect.value = p.mode;
+  els.examCategory.value = p.examCategory;
   els.difficultySelect.value = p.difficulty;
   els.viewMode.value = p.viewMode;
   els.maxCount.value = p.maxCount || '';
@@ -203,6 +210,7 @@ function syncPresetStateForCurrent() {
   const hit = Object.entries(PRESETS).find(([, p]) => {
     return (
       p.mode === cur.mode &&
+      p.examCategory === cur.examCategory &&
       p.difficulty === cur.difficulty &&
       p.viewMode === cur.viewMode &&
       String(p.maxCount || '') === String(cur.maxCount || '') &&
@@ -231,9 +239,18 @@ function shuffleArray(arr) {
 }
 
 function filterQuestions() {
+  const category = els.examCategory.value;
   const diff = els.difficultySelect.value;
   const maxCount = toInt(els.maxCount.value, 0);
-  let filtered = diff === 'all' ? [...allQuestions] : allQuestions.filter((q) => q.difficulty === diff);
+
+  let filtered = [...allQuestions];
+  if (category !== 'all') {
+    filtered = filtered.filter((q) => (q.category || '토목기사') === category);
+  }
+  if (diff !== 'all') {
+    filtered = filtered.filter((q) => q.difficulty === diff);
+  }
+
   if (maxCount > 0) filtered = filtered.slice(0, maxCount);
   return filtered;
 }
@@ -335,7 +352,7 @@ function buildWrongMarkdownText() {
       const key = qKeyFor(idx, q);
       if (!wrongIds.has(key)) return null;
       const user = answerMeta.get(key) || '-';
-      return `- ${q.id}: ${q.question || '문항 없음'}\n  - 난이도: ${q.difficulty || '-'}\n  - 내 답안: ${user}\n  - 정답: ${q.answer || '-'}\n  - 해설: ${q.explanation || '해설 없음'}`;
+      return `- ${q.id}: ${q.question || '문항 없음'}\n  - 분류: ${q.category || '토목기사'}\n  - 난이도: ${q.difficulty || '-'}\n  - 내 답안: ${user}\n  - 정답: ${q.answer || '-'}\n  - 해설: ${q.explanation || '해설 없음'}`;
     })
     .filter(Boolean);
 
@@ -414,7 +431,7 @@ function makeCard(q, index, total) {
   card.dataset.qid = key;
 
   const h3 = document.createElement('h3');
-  h3.textContent = `문항 ${index + 1} / ${total} - ${q.id || 'NoID'} (${q.difficulty || '-'})`;
+  h3.textContent = `문항 ${index + 1} / ${total} - ${q.id || 'NoID'} (${q.category || '토목기사'} / ${q.difficulty || '-'})`;
 
   const qText = document.createElement('p');
   qText.textContent = q.question || '문항이 없습니다.';
@@ -697,6 +714,10 @@ els.btnPrev.addEventListener('click', goPrev);
 els.btnNext.addEventListener('click', goNext);
 els.modeSelect.addEventListener('change', () => {
   if (els.modeSelect.value === 'test') syncPresetState();
+  applyFiltersAndRender();
+});
+els.examCategory.addEventListener('change', () => {
+  markPresetCustom();
   applyFiltersAndRender();
 });
 els.difficultySelect.addEventListener('change', () => {
