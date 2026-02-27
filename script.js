@@ -607,6 +607,54 @@ function syncPresetState() {
   syncPresetStateForCurrent();
 }
 
+function getCurrentCardContext() {
+  if (!els.quizArea.children.length) return null;
+  return els.quizArea.querySelector('.card');
+}
+
+function bindKeyboardShortcuts(e) {
+  const activeTag = document.activeElement?.tagName?.toLowerCase();
+  if (['input', 'textarea', 'select', 'button'].includes(activeTag)) {
+    return;
+  }
+
+  if (els.viewMode.value !== 'single') return;
+  const card = getCurrentCardContext();
+  if (!card) return;
+
+  const key = e.key;
+  const options = Array.from(card.querySelectorAll('.option'));
+
+  // 숫자키로 보기 선택(1~9)
+  if (/^\d$/.test(key)) {
+    const idx = Number(key) - 1;
+    if (idx >= 0 && idx < options.length) {
+      e.preventDefault();
+      options[idx].click();
+    }
+    return;
+  }
+
+  if (key === 'ArrowLeft') {
+    e.preventDefault();
+    goPrev();
+    return;
+  }
+
+  if (key === 'ArrowRight') {
+    e.preventDefault();
+    goNext();
+    return;
+  }
+
+  if (key === 'Enter') {
+    const btnCheck = card.querySelector('button');
+    if (!btnCheck) return;
+    e.preventDefault();
+    btnCheck.click();
+  }
+}
+
 els.btnApplyPreset.addEventListener('click', () => {
   const key = els.presetSelect.value;
   if (key === 'custom') return;
@@ -749,4 +797,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   updateStatusAndStats();
   renderStats();
   syncPresetState();
+
+  window.addEventListener('keydown', bindKeyboardShortcuts);
 });
