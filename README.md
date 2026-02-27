@@ -115,6 +115,17 @@ git push -u origin main
 3. Branch: `main`, Folder: `/ (root)`
 4. 저장 후 제공되는 Pages URL로 배포 확인
 
+
+## 카테고리 샘플/템플릿 생성
+- 분류별 JSON/CSV/템플릿을 한 번에 만들기:
+  ```bash
+  node scripts/export-category-samples.js
+  ```
+- 출력 파일: `templates/`
+  - `토목기사.json`, `공기업.json`, `공무원.json`
+  - 동일한 `*.csv`, `*.template.json`
+- 템플릿 파일은 신규 문제 추가 시 스키마 복사에 사용하세요.
+
 ## 마무리 체크
 - `http://127.0.0.1:8000/index.html` 응답 확인
 - 채점/복기/복사 동작 확인

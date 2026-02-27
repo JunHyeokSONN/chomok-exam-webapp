@@ -1,0 +1,20 @@
+{
+  "category": "공기업",
+  "questions": [
+    {
+      "id": "공000",
+      "category": "공기업",
+      "question": "문항을 여기에 입력하세요",
+      "type": "multiple",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "answer": "1",
+      "explanation": "해설을 여기에 입력하세요",
+      "difficulty": "normal"
+    }
+  ]
+}

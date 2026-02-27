@@ -1,0 +1,48 @@
+{
+  "category": "공기업",
+  "questions": [
+    {
+      "id": "G001",
+      "category": "공기업",
+      "question": "상수도 시설에서 급수관 파열 사고 방지를 위한 압력제어의 핵심 목적은?",
+      "type": "multiple",
+      "options": [
+        "누수 감소",
+        "수질 개선",
+        "수압 급변 억제",
+        "파손 후 복구 속도 향상"
+      ],
+      "answer": "수압 급변 억제",
+      "explanation": "비정상 압력 상승/급락은 배관 파열과 누수의 원인이 되므로 급변 억제가 핵심입니다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "G002",
+      "category": "공기업",
+      "question": "시설물 점검 주기 설정 시 우선순위가 가장 높은 항목은 어떤 위험도가 큰가?",
+      "type": "multiple",
+      "options": [
+        "설계연도",
+        "소유권",
+        "안전·고장 가능성",
+        "외관 미관"
+      ],
+      "answer": "안전·고장 가능성",
+      "explanation": "안전 우려와 고장 확률이 높은 설비부터 선점검·보수 계획을 수립합니다.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "G003",
+      "category": "공기업",
+      "question": "상수도 계량 설비는 1일 기준 사용량 예측의 신뢰도 향상에 기여한다.",
+      "type": "truefalse",
+      "options": [
+        "참",
+        "거짓"
+      ],
+      "answer": "참",
+      "explanation": "계량 데이터는 누수·피크수요 관리와 예측 정확도 향상에 중요합니다.",
+      "difficulty": "easy"
+    }
+  ]
+}

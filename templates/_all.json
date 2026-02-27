@@ -1,0 +1,143 @@
+{
+  "category": "전체",
+  "questions": [
+    {
+      "id": "T001",
+      "category": "토목기사",
+      "question": "토목공학에서 하중이용도 계수로 가장 적절한 것은?",
+      "type": "multiple",
+      "options": [
+        "1.0",
+        "1.2",
+        "0.7",
+        "2.0"
+      ],
+      "answer": "1.2",
+      "explanation": "일반적으로 설계 하중 산정에서 하중의 허용 오차와 안전율을 고려한 계수로 1.2가 자주 사용됩니다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "T002",
+      "category": "토목기사",
+      "question": "콘크리트의 압축강도는 보통 어떤 단위로 표시하는가?",
+      "type": "multiple",
+      "options": [
+        "kgf/cm2",
+        "N/m2",
+        "kgf/m2",
+        "Pa"
+      ],
+      "answer": "kgf/cm2",
+      "explanation": "실무 표기에서는 MPa(=N/mm2)와 병기되는 경우가 많지만, 과거 시험자료에는 kgf/cm2가 자주 나옵니다.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "T003",
+      "category": "토목기사",
+      "question": "포화토의 공극수율이 증가하면 투수성은 보통 감소한다.",
+      "type": "truefalse",
+      "options": [
+        "참",
+        "거짓"
+      ],
+      "answer": "참",
+      "explanation": "공극이 크고 상호 연결성이 약해지면 투수성 저하가 일반적으로 관찰됩니다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "T004",
+      "category": "토목기사",
+      "question": "다짐압축시험에서 오일러 안정 조건을 한 줄로 쓰시오.",
+      "type": "short",
+      "answer": "하중 경로를 따라 안정율이 1 이상이어야 한다.",
+      "explanation": "시험 문제에서는 구조 안정성 확보의 임계 조건을 간결하게 서술하는 형태로 출제됩니다.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "G001",
+      "category": "공기업",
+      "question": "상수도 시설에서 급수관 파열 사고 방지를 위한 압력제어의 핵심 목적은?",
+      "type": "multiple",
+      "options": [
+        "누수 감소",
+        "수질 개선",
+        "수압 급변 억제",
+        "파손 후 복구 속도 향상"
+      ],
+      "answer": "수압 급변 억제",
+      "explanation": "비정상 압력 상승/급락은 배관 파열과 누수의 원인이 되므로 급변 억제가 핵심입니다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "G002",
+      "category": "공기업",
+      "question": "시설물 점검 주기 설정 시 우선순위가 가장 높은 항목은 어떤 위험도가 큰가?",
+      "type": "multiple",
+      "options": [
+        "설계연도",
+        "소유권",
+        "안전·고장 가능성",
+        "외관 미관"
+      ],
+      "answer": "안전·고장 가능성",
+      "explanation": "안전 우려와 고장 확률이 높은 설비부터 선점검·보수 계획을 수립합니다.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "G003",
+      "category": "공기업",
+      "question": "상수도 계량 설비는 1일 기준 사용량 예측의 신뢰도 향상에 기여한다.",
+      "type": "truefalse",
+      "options": [
+        "참",
+        "거짓"
+      ],
+      "answer": "참",
+      "explanation": "계량 데이터는 누수·피크수요 관리와 예측 정확도 향상에 중요합니다.",
+      "difficulty": "easy"
+    },
+    {
+      "id": "P001",
+      "category": "공무원",
+      "question": "교량 점검 시 즉시 통행 제한 판단의 기본 원칙은?",
+      "type": "multiple",
+      "options": [
+        "외관만 확인",
+        "동적 진동량만 확인",
+        "안전성 우선 판단 및 필요 시 통제 조치",
+        "유지보수 비용 최소화가 우선"
+      ],
+      "answer": "안전성 우선 판단 및 필요 시 통제 조치",
+      "explanation": "공공 인프라 점검에서 대중 안전을 최우선으로 하며, 조기 통제조치가 핵심입니다.",
+      "difficulty": "normal"
+    },
+    {
+      "id": "P002",
+      "category": "공무원",
+      "question": "도로 안전점검 기록에서 응급조치가 필요한 징후로 가장 적절한 것은?",
+      "type": "multiple",
+      "options": [
+        "표면 균열 미소 흔적",
+        "확장관의 점검일 변경",
+        "국부 침하 및 유수해짐 징후",
+        "야간조도 보강 필요"
+      ],
+      "answer": "국부 침하 및 유수해짐 징후",
+      "explanation": "균열과 연계된 구조적 하중재분배 위험이 큰 국부 침하는 즉시 조치 대상입니다.",
+      "difficulty": "hard"
+    },
+    {
+      "id": "P003",
+      "category": "공무원",
+      "question": "민원 대응 시 신속·정확한 시설 상태 안내는 행정 신뢰도 향상에 기여한다.",
+      "type": "truefalse",
+      "options": [
+        "참",
+        "거짓"
+      ],
+      "answer": "참",
+      "explanation": "정보 공개와 처리 진행 공유는 공공기관 신뢰도를 높이는 핵심 요건입니다.",
+      "difficulty": "easy"
+    }
+  ]
+}
