@@ -1,5 +1,9 @@
 :root {
   --bg: #0f1117;
+  --safe-top: env(safe-area-inset-top);
+  --safe-right: env(safe-area-inset-right);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
   --card: #171a23;
   --text: #e5e7eb;
   --muted: #b6becb;
@@ -15,6 +19,7 @@
 
 body {
   margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -22,9 +27,11 @@ body {
 }
 
 .wrap {
-  width: min(1120px, calc(100vw - 1.5rem));
+  width: min(1120px, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
   margin: 0 auto;
-  padding: 1rem 0;
+  padding: 1rem 0 1rem;
+  padding-left: max(0rem, 0px + var(--safe-left));
+  padding-right: max(0rem, 0px + var(--safe-right));
 }
 
 header {
@@ -252,7 +259,10 @@ ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
 @media (max-width: 640px) {
   .wrap {
     width: calc(100% - 1rem);
-    padding-top: 0.7rem;
+    padding-top: calc(0.7rem + var(--safe-top));
+    padding-left: calc(0.25rem + var(--safe-left));
+    padding-right: calc(0.25rem + var(--safe-right));
+    padding-bottom: calc(0.5rem + var(--safe-bottom));
   }
 
   .toolbar {
