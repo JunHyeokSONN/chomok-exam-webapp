@@ -1,4 +1,36 @@
+const PRESETS = {
+  quick: {
+    label: '빠른 체크 (20분/15문/중)',
+    mode: 'test',
+    difficulty: 'normal',
+    viewMode: 'single',
+    maxCount: 15,
+    timeLimitMin: 20,
+    autoNext: true
+  },
+  exam: {
+    label: '본시험 모의 (40분/40문/전체)',
+    mode: 'test',
+    difficulty: 'all',
+    viewMode: 'single',
+    maxCount: 40,
+    timeLimitMin: 40,
+    autoNext: true
+  },
+  study: {
+    label: '학습 루틴 (전체/무제한/학습)',
+    mode: 'learn',
+    difficulty: 'all',
+    viewMode: 'all',
+    maxCount: '',
+    timeLimitMin: 20,
+    autoNext: false
+  }
+};
+
 const els = {
+  presetSelect: document.getElementById('presetSelect'),
+  btnApplyPreset: document.getElementById('btnApplyPreset'),
   modeSelect: document.getElementById('modeSelect'),
   difficultySelect: document.getElementById('difficultySelect'),
   viewMode: document.getElementById('viewMode'),
@@ -37,44 +69,49 @@ let timerHandle = null;
 let remainingSec = 0;
 let inTest = false;
 
-let answerMeta = new Map(); // qKey => userAnswer (raw)
-let gradedMeta = new Map(); // qKey => {isCorrect, picked, byAuto}
-let wrongIds = new Set(); // qKey set
+let answerMeta = new Map();
+let gradedMeta = new Map();
+let wrongIds = new Set();
+
+const STORAGE = {
+  progress: 'chomok_progress',
+  backup: 'chomok_questions_backup',
+  preset: 'chomok_preset'
+};
 
 function qKeyFor(idx, q) {
-  return (q && q.id) ? q.id : `q_${idx}`;
+  return q && q.id ? q.id : `q_${idx}`;
 }
 
 function setStatus(text) {
   els.status.textContent = text;
 }
 
-function toCanonicalAnswer(raw) {
+function canonicalize(raw) {
   return String(raw || '')
     .toLowerCase()
     .replace(/\s+/g, '')
     .replace(/,/g, '')
-    .replace(/\((.*?)\)/g, '$1')
+    .replace(/\(.*?\)/g, '$1')
     .replace(/\s*[*/]\s*/g, '/')
     .replace(/kgf\/cm2|kgfcm2/g, 'kgfcm2');
 }
 
-function normalizeShort(raw) {
-  return toCanonicalAnswer(raw)
+function normalize(raw) {
+  return canonicalize(raw)
     .replace(/[^\p{L}\p{N}./%+\-_=]/gu, '');
 }
 
-function loadIdCheckedQuestions(rawQuestions) {
+function sanitizeQuestions(items) {
   const seen = new Set();
   const fixed = [];
-  let dupCount = 0;
-
-  rawQuestions.forEach((item, idx) => {
-    const q = { ...item };
+  let duplicated = 0;
+  items.forEach((raw, idx) => {
+    const q = { ...raw };
     let id = String(q.id || '').trim();
     if (!id) id = `AUTO_${idx + 1}`;
     if (seen.has(id)) {
-      dupCount += 1;
+      duplicated += 1;
       let c = 2;
       while (seen.has(`${id}_${c}`)) c += 1;
       id = `${id}_${c}`;
@@ -84,16 +121,86 @@ function loadIdCheckedQuestions(rawQuestions) {
     fixed.push(q);
   });
 
-  if (dupCount > 0) {
-    els && console.log(`중복 ID 자동 보정: ${dupCount}개`);
+  if (duplicated > 0) {
+    console.info(`문항 ID 중복 보정: ${duplicated}개`);
   }
   return fixed;
+}
+
+function toInt(v, fallback) {
+  const n = parseInt(v, 10);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+function fillPresetOptions() {
+  for (const [key, v] of Object.entries(PRESETS)) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = v.label;
+    els.presetSelect.appendChild(opt);
+  }
+}
+
+function getPresetFromUI() {
+  return {
+    mode: els.modeSelect.value,
+    difficulty: els.difficultySelect.value,
+    viewMode: els.viewMode.value,
+    maxCount: els.maxCount.value,
+    timeLimitMin: els.timeLimitMin.value,
+    autoNext: els.autoNext.checked
+  };
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  els.modeSelect.value = p.mode;
+  els.difficultySelect.value = p.difficulty;
+  els.viewMode.value = p.viewMode;
+  els.maxCount.value = p.maxCount || '';
+  els.timeLimitMin.value = String(p.timeLimitMin || 20);
+  els.autoNext.checked = !!p.autoNext;
+  localStorage.setItem(STORAGE.preset, key);
+}
+
+function markPresetCustom() {
+  if (els.presetSelect.value !== 'custom') {
+    els.presetSelect.value = 'custom';
+    localStorage.setItem(STORAGE.preset, 'custom');
+  }
+}
+
+function loadPreset() {
+  const saved = localStorage.getItem(STORAGE.preset) || 'custom';
+  const has = Object.keys(PRESETS).includes(saved);
+  if (!has) {
+    els.presetSelect.value = 'custom';
+    return;
+  }
+  els.presetSelect.value = saved;
+  applyPreset(saved);
+}
+
+function syncPresetStateForCurrent() {
+  const cur = getPresetFromUI();
+  const hit = Object.entries(PRESETS).find(([, p]) => {
+    return (
+      p.mode === cur.mode &&
+      p.difficulty === cur.difficulty &&
+      p.viewMode === cur.viewMode &&
+      String(p.maxCount || '') === String(cur.maxCount || '') &&
+      String(p.timeLimitMin) === String(cur.timeLimitMin) &&
+      !!p.autoNext === cur.autoNext
+    );
+  });
+  els.presetSelect.value = hit ? hit[0] : 'custom';
 }
 
 async function loadDefault() {
   const res = await fetch('data.json');
   const data = await res.json();
-  allQuestions = loadIdCheckedQuestions(data.questions || []);
+  allQuestions = sanitizeQuestions(data.questions || []);
   els.jsonInput.value = JSON.stringify(allQuestions, null, 2);
   applyFiltersAndRender();
 }
@@ -109,20 +216,17 @@ function shuffleArray(arr) {
 
 function filterQuestions() {
   const diff = els.difficultySelect.value;
-  const maxCount = parseInt(els.maxCount.value, 10);
+  const maxCount = toInt(els.maxCount.value, 0);
   let filtered = diff === 'all' ? [...allQuestions] : allQuestions.filter((q) => q.difficulty === diff);
-  if (Number.isInteger(maxCount) && maxCount > 0) {
-    filtered = filtered.slice(0, maxCount);
-  }
+  if (maxCount > 0) filtered = filtered.slice(0, maxCount);
   return filtered;
 }
 
 function startTimer(minutes) {
   if (timerHandle) clearInterval(timerHandle);
-  remainingSec = Math.max(1, parseInt(minutes, 10) || 20) * 60;
+  remainingSec = Math.max(1, toInt(minutes, 20)) * 60;
   els.timerPanel.hidden = false;
   renderTimer();
-
   timerHandle = setInterval(() => {
     remainingSec -= 1;
     if (remainingSec <= 0) {
@@ -146,18 +250,13 @@ function renderTimer() {
   els.timerText.textContent = `${mm}:${ss}`;
 }
 
-function markStatus() {
-  const total = sessionQuestions.length;
-  const answered = [...Array(total)].reduce((acc, _, idx) => {
-    const key = qKeyFor(idx, sessionQuestions[idx]);
-    return acc + (normalizeShort(answerMeta.get(key) || '') ? 1 : 0);
-  }, 0);
-
-  if (els.viewMode.value === 'single') {
-    setStatus(`문항 ${Math.min(currentIndex + 1, total)} / ${total} (답안완료 ${answered}개)`);
-  } else {
-    setStatus(`문항 ${total} / ${total} (답안완료 ${answered}개)`);
-  }
+function countAnswered() {
+  let answered = 0;
+  sessionQuestions.forEach((q, idx) => {
+    const key = qKeyFor(idx, q);
+    if (normalize(answerMeta.get(key) || '')) answered += 1;
+  });
+  return answered;
 }
 
 function evaluateSessionScore() {
@@ -166,9 +265,9 @@ function evaluateSessionScore() {
 
   sessionQuestions.forEach((q, idx) => {
     const key = qKeyFor(idx, q);
-    const user = normalizeShort(answerMeta.get(key) || '');
-    const correct = normalizeShort(q.answer || '');
-    const isCorrect = user && user === correct;
+    const user = normalize(answerMeta.get(key) || '');
+    const correct = normalize(q.answer || '');
+    const isCorrect = !!user && user === correct;
 
     if (!isCorrect) {
       wrong += 1;
@@ -180,14 +279,31 @@ function evaluateSessionScore() {
     }
   });
 
-  const right = sessionQuestions.length - wrong;
-  return { total: sessionQuestions.length, wrong, right, wrongByDiff };
+  return {
+    total: sessionQuestions.length,
+    wrong,
+    right: sessionQuestions.length - wrong,
+    wrongByDiff
+  };
 }
 
-function updateStats() {
-  const { right, total, wrong, wrongByDiff } = evaluateSessionScore();
+function updateStatusAndStats() {
+  const answered = countAnswered();
+  const total = sessionQuestions.length;
+  const { right, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
+
+  if (els.viewMode.value === 'single') {
+    setStatus(`문항 ${Math.min(currentIndex + 1, total)} / ${total} (답안완료 ${answered}개)`);
+  } else {
+    setStatus(`문항 ${total} / ${total} (답안완료 ${answered}개)`);
+  }
+
   els.scoreText.textContent = `현재 정답(미응답 감점): ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
+}
+
+function renderStats() {
+  const { wrongByDiff } = evaluateSessionScore();
   els.statsByDiff.innerHTML = `
     <ul>
       <li>하난도 오답: ${wrongByDiff.easy}</li>
@@ -195,26 +311,80 @@ function updateStats() {
       <li>상난도 오답: ${wrongByDiff.hard}</li>
     </ul>
   `;
-  els.resultBox.hidden = false;
 }
 
-function buildQuestionCard(q, index, total) {
+function applyGradeVisual(q, key, card, optionsWrap, isCorrect) {
+  const picked = answerMeta.get(key) || '';
+  if (!isCorrect) card.classList.add('graded-wrong');
+
+  const footer = document.createElement('p');
+  const stateClass = isCorrect ? 'okText' : 'badText';
+  footer.innerHTML = `<span class="${stateClass}"><strong>${isCorrect ? '정답' : '오답'}</strong></span> : ${q.explanation || '해설 없음'} (정답: ${q.answer})`;
+  if (!card.querySelector('.okText, .badText')) card.appendChild(footer);
+
+  if (q.type === 'short') {
+    if (!card.querySelector('.short-answer')) {
+      const p = document.createElement('p');
+      p.className = 'short-answer';
+      p.textContent = `정답: ${q.answer}`;
+      card.appendChild(p);
+    }
+  } else {
+    [...optionsWrap.querySelectorAll('.option')].forEach((x) => {
+      if (normalize(x.textContent) === normalize(q.answer || '')) x.classList.add('correct');
+      if (normalize(x.textContent) === normalize(picked) && !isCorrect) x.classList.add('wrong');
+    });
+  }
+
+  optionsWrap.querySelectorAll('.option, input').forEach((el) => (el.disabled = true));
+}
+
+function gradeOne(index, key, q, card, optionsWrap, shouldCheck) {
+  const pickedRaw = normalize(answerMeta.get(key) || '');
+  const correct = normalize(q.answer || '');
+  if (!pickedRaw && shouldCheck) {
+    alert('답안을 선택/입력해 주세요.');
+    return;
+  }
+
+  let isCorrect = false;
+  if (shouldCheck) {
+    isCorrect = pickedRaw === correct;
+    wrongIds.delete(key);
+    if (!isCorrect) wrongIds.add(key);
+    gradedMeta.set(key, { picked: pickedRaw, isCorrect, byManual: true });
+  } else {
+    wrongIds.add(key);
+    gradedMeta.set(key, { picked: pickedRaw, isCorrect: false, byManual: false });
+  }
+
+  applyGradeVisual(q, key, card, optionsWrap, isCorrect);
+  persistProgress();
+  updateStatusAndStats();
+  renderStats();
+  syncPresetState();
+
+  if (els.viewMode.value === 'single' && inTest && els.autoNext.checked && index < sessionQuestions.length - 1) {
+    setTimeout(() => goNext(), 250);
+  }
+}
+
+function makeCard(q, index, total) {
   const card = document.createElement('section');
   card.className = 'card';
   const key = qKeyFor(index, q);
   card.dataset.qid = key;
 
-  const isShort = q.type === 'short';
-  const qText = document.createElement('p');
-  qText.textContent = q.question || '문항이 없습니다.';
-
   const h3 = document.createElement('h3');
   h3.textContent = `문항 ${index + 1} / ${total} - ${q.id || 'NoID'} (${q.difficulty || '-'})`;
+
+  const qText = document.createElement('p');
+  qText.textContent = q.question || '문항이 없습니다.';
 
   const optionsWrap = document.createElement('div');
   optionsWrap.className = 'options';
 
-  if (isShort) {
+  if (q.type === 'short') {
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = '정답 입력';
@@ -222,30 +392,29 @@ function buildQuestionCard(q, index, total) {
     input.addEventListener('input', () => {
       answerMeta.set(key, input.value);
       persistProgress();
-      markStatus();
-      updateStats();
+      updateStatusAndStats();
+      renderStats();
+      syncPresetState();
     });
     optionsWrap.appendChild(input);
   } else {
-    const options = Array.isArray(q.options) ? q.options : [];
-    options.forEach((opt) => {
+    const opts = Array.isArray(q.options) ? q.options : [];
+    opts.forEach((opt) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'option';
       btn.textContent = opt;
-      if (normalizeShort(answerMeta.get(key) || '') === normalizeShort(opt)) {
-        btn.classList.add('selected');
-      }
+      if (normalize(answerMeta.get(key) || '') === normalize(opt)) btn.classList.add('selected');
 
       btn.addEventListener('click', () => {
         optionsWrap.querySelectorAll('.option').forEach((x) => x.classList.remove('selected'));
         btn.classList.add('selected');
         answerMeta.set(key, opt);
         persistProgress();
-        markStatus();
-        updateStats();
+        updateStatusAndStats();
+        renderStats();
+        syncPresetState();
       });
-
       optionsWrap.appendChild(btn);
     });
   }
@@ -269,70 +438,18 @@ function buildQuestionCard(q, index, total) {
     wrongIds.delete(key);
     persistProgress();
     renderSession();
-    updateStats();
-    markStatus();
+    updateStatusAndStats();
+    renderStats();
+    syncPresetState();
   });
 
   actions.append(btnCheck, btnReveal, btnClear);
 
   card.append(h3, qText, optionsWrap, actions);
+
+  const state = gradedMeta.get(key);
+  if (state) applyGradeVisual(q, key, card, optionsWrap, state.isCorrect);
   return card;
-}
-
-function applyGradeVisual(q, index, key, card, optionsWrap, isCorrect) {
-  const isShort = q.type === 'short';
-  const picked = answerMeta.get(key) || '';
-
-  const footer = document.createElement('p');
-  const stateClass = isCorrect ? 'okText' : 'badText';
-  footer.innerHTML = `<span class="${stateClass}"><strong>${isCorrect ? '정답' : '오답'}</strong></span> : ${q.explanation || '해설 없음'} (정답: ${q.answer})`;
-
-  if (!card.querySelector('.okText, .badText')) card.appendChild(footer);
-
-  if (!isShort) {
-    const options = [...optionsWrap.querySelectorAll('.option')];
-    options.forEach((x) => {
-      if (normalizeShort(x.textContent) === normalizeShort(q.answer || '')) x.classList.add('correct');
-      if (normalizeShort(x.textContent) === normalizeShort(picked) && !isCorrect) x.classList.add('wrong');
-    });
-  } else {
-    const p = document.createElement('p');
-    p.textContent = `정답: ${q.answer}`;
-    if (!isShort && !card.querySelector('p:nth-of-type(4)')) card.appendChild(p);
-  }
-
-  optionsWrap.querySelectorAll('.option, input').forEach((el) => (el.disabled = true));
-}
-
-function gradeOne(index, key, q, card, optionsWrap, shouldCheck) {
-  const isShort = q.type === 'short';
-  const pickedRaw = normalizeShort(answerMeta.get(key) || '');
-  const correct = normalizeShort(q.answer || '');
-  if (!pickedRaw && shouldCheck) {
-    alert('답안을 선택/입력해 주세요.');
-    return;
-  }
-
-  let isCorrect = false;
-  if (shouldCheck) {
-    isCorrect = pickedRaw === correct;
-    wrongIds.delete(key);
-    if (!isCorrect) wrongIds.add(key);
-    gradedMeta.set(key, { picked: pickedRaw, isCorrect, byAuto: false });
-  } else {
-    wrongIds.add(key);
-    isCorrect = false;
-    gradedMeta.set(key, { picked: pickedRaw, isCorrect: false, byAuto: false });
-  }
-
-  applyGradeVisual(q, index, key, card, optionsWrap, isCorrect);
-  persistProgress();
-  updateStats();
-  markStatus();
-
-  if (els.viewMode.value === 'single' && inTest && els.autoNext.checked && index < sessionQuestions.length - 1) {
-    setTimeout(() => goNext(), 250);
-  }
 }
 
 function renderSingle() {
@@ -344,47 +461,30 @@ function renderSingle() {
   }
 
   const q = sessionQuestions[currentIndex];
-  const key = qKeyFor(currentIndex, q);
   els.quizArea.innerHTML = '';
-  els.quizArea.appendChild(buildQuestionCard(q, currentIndex, sessionQuestions.length));
+  const card = makeCard(q, currentIndex, sessionQuestions.length);
+  els.quizArea.appendChild(card);
+
   els.singlePos.textContent = `${currentIndex + 1} / ${sessionQuestions.length}`;
   els.singleNav.hidden = false;
 
-  // 이미 채점됐던 상태 복원
-  const state = gradedMeta.get(key);
-  if (state) {
-    const card = els.quizArea.querySelector('.card');
-    const optionsWrap = card.querySelector('.options');
-    if (state.isCorrect) {
-      applyGradeVisual(q, currentIndex, key, card, optionsWrap, true);
-    }
-  }
-
-  markStatus();
+  updateStatusAndStats();
+  renderStats();
 }
 
 function renderAll() {
   els.quizArea.innerHTML = '';
   sessionQuestions.forEach((q, idx) => {
-    const card = buildQuestionCard(q, idx, sessionQuestions.length);
-    const key = qKeyFor(idx, q);
-    const state = gradedMeta.get(key);
-    const optionsWrap = card.querySelector('.options');
-    if (state) {
-      applyGradeVisual(q, idx, key, card, optionsWrap, state.isCorrect);
-    }
-    els.quizArea.appendChild(card);
+    els.quizArea.appendChild(makeCard(q, idx, sessionQuestions.length));
   });
   els.singleNav.hidden = true;
-  markStatus();
+  updateStatusAndStats();
+  renderStats();
 }
 
 function renderSession() {
-  if (els.viewMode.value === 'single') {
-    renderSingle();
-  } else {
-    renderAll();
-  }
+  if (els.viewMode.value === 'single') renderSingle();
+  else renderAll();
 }
 
 function applyFiltersAndRender() {
@@ -398,11 +498,14 @@ function applyFiltersAndRender() {
   wrongIds = new Set();
   currentIndex = 0;
   inTest = false;
+
   stopTimer();
   renderSession();
-  updateStats();
+  updateStatusAndStats();
+  renderStats();
   els.resultBox.hidden = false;
   els.wrongMarkdown.hidden = true;
+  syncPresetState();
 }
 
 function goNext() {
@@ -420,62 +523,106 @@ function goPrev() {
 function persistProgress() {
   const state = {
     savedAt: new Date().toISOString(),
-    questions: sessionQuestions,
     answers: Array.from(answerMeta.entries()),
     graded: Array.from(gradedMeta.entries())
   };
-  localStorage.setItem('chomok_progress', JSON.stringify(state));
+  localStorage.setItem(STORAGE.progress, JSON.stringify(state));
 }
 
 function restoreProgress() {
   try {
-    const raw = localStorage.getItem('chomok_progress');
+    const raw = localStorage.getItem(STORAGE.progress);
     if (!raw) return;
     const state = JSON.parse(raw);
-    if (!state?.answers || !Array.isArray(state.answers)) return;
-    answerMeta = new Map(state.answers);
+    if (Array.isArray(state?.answers)) {
+      answerMeta = new Map(state.answers);
+    }
+    if (Array.isArray(state?.graded)) {
+      gradedMeta = new Map(state.graded);
+    }
   } catch {}
 }
 
-function loadJsonText(rawText) {
+function loadJson(rawText) {
   const parsed = JSON.parse(rawText);
   const items = Array.isArray(parsed) ? parsed : parsed.questions;
-  if (!Array.isArray(items)) throw new Error('JSON 형식 오류');
-  allQuestions = loadIdCheckedQuestions(items);
+  if (!Array.isArray(items)) throw new Error('json 형식 오류');
+
+  allQuestions = sanitizeQuestions(items);
   els.jsonInput.value = JSON.stringify(allQuestions, null, 2);
-  localStorage.setItem('chomok_questions_backup', JSON.stringify(allQuestions));
+  localStorage.setItem(STORAGE.backup, JSON.stringify(allQuestions));
   applyFiltersAndRender();
 }
 
 function computeFinalResult({ auto = false } = {}) {
   stopTimer();
-  const { right, total } = evaluateSessionScore();
+  const { right, total, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
   if (auto) alert('시간 종료! 자동 채점합니다.');
-  els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%)`;
-  updateStats();
+  els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
+  renderStats();
   els.resultBox.hidden = false;
 }
+
+function syncPresetState() {
+  syncPresetStateForCurrent();
+}
+
+els.btnApplyPreset.addEventListener('click', () => {
+  const key = els.presetSelect.value;
+  if (key === 'custom') return;
+  applyPreset(key);
+  applyFiltersAndRender();
+});
+
+els.presetSelect.addEventListener('change', () => {
+  const key = els.presetSelect.value;
+  if (key === 'custom') return;
+  applyPreset(key);
+  applyFiltersAndRender();
+});
 
 els.btnShuffle.addEventListener('click', () => {
   sessionQuestions = shuffleArray(sessionQuestions);
   currentIndex = 0;
   renderSession();
 });
-els.btnReset.addEventListener('click', () => applyFiltersAndRender());
+
+els.btnReset.addEventListener('click', () => {
+  applyFiltersAndRender();
+});
+
 els.btnStartTest.addEventListener('click', () => {
   if (!sessionQuestions.length) return;
+  inTest = true;
+  if (els.modeSelect.value !== 'test') {
+    const msg = '시험 모드는 시험 모드가 선택되어 있어야 합니다. 모드를 시험 모드로 변경할게요.';
+    alert(msg);
+    els.modeSelect.value = 'test';
+  }
   applyFiltersAndRender();
   inTest = true;
-  startTimer(parseInt(els.timeLimitMin.value || '20', 10));
+  startTimer(els.timeLimitMin.value || 20);
 });
+
 els.btnFinishTest.addEventListener('click', () => computeFinalResult());
-els.modeSelect.addEventListener('change', applyFiltersAndRender);
-els.difficultySelect.addEventListener('change', applyFiltersAndRender);
-els.viewMode.addEventListener('change', renderSession);
 els.btnPrev.addEventListener('click', goPrev);
 els.btnNext.addEventListener('click', goNext);
-
+els.modeSelect.addEventListener('change', () => {
+  if (els.modeSelect.value === 'test') syncPresetState();
+  applyFiltersAndRender();
+});
+els.difficultySelect.addEventListener('change', () => {
+  markPresetCustom();
+  applyFiltersAndRender();
+});
+els.viewMode.addEventListener('change', () => {
+  markPresetCustom();
+  renderSession();
+});
+els.maxCount.addEventListener('change', markPresetCustom);
+els.timeLimitMin.addEventListener('change', markPresetCustom);
+els.autoNext.addEventListener('change', markPresetCustom);
 els.btnRetryWrong.addEventListener('click', () => {
   if (!wrongIds.size) {
     alert('오답 문제가 없습니다.');
@@ -483,18 +630,25 @@ els.btnRetryWrong.addEventListener('click', () => {
   }
 
   const wrong = sessionQuestions.filter((q, idx) => wrongIds.has(qKeyFor(idx, q)));
+  if (!wrong.length) {
+    alert('오답 문제를 찾지 못했습니다.');
+    return;
+  }
   sessionQuestions = wrong;
   currentIndex = 0;
   inTest = false;
   renderSession();
-  updateStats();
+  updateStatusAndStats();
+  renderStats();
 });
 
 els.btnCopyMarkdown.addEventListener('click', async () => {
   const wrongList = [...wrongIds]
     .map((key) => {
       const idx = parseInt(String(key).replace(/^q_/, ''), 10);
-      const q = Number.isInteger(idx) ? sessionQuestions[idx] : allQuestions.find((x) => x.id === key);
+      const q = Number.isInteger(idx)
+        ? sessionQuestions[idx]
+        : allQuestions.find((x) => x.id === key);
       if (!q) return null;
       return `- ${q.id}: ${q.question}\n  - 정답: ${q.answer}`;
     })
@@ -506,63 +660,68 @@ els.btnCopyMarkdown.addEventListener('click', async () => {
   els.wrongMarkdown.textContent = text;
   try {
     await navigator.clipboard.writeText(text);
-    alert('오답 내역을 복사했습니다.');
+    alert('오답 내역 복사 완료');
   } catch {
-    alert('클립보드 복사 실패: 화면에서 복사하세요.');
+    alert('클립보드 복사 실패. 화면에서 수동 복사해 주세요.');
   }
 });
 
 els.btnLoadJson.addEventListener('click', () => {
   try {
-    loadJsonText(els.jsonInput.value);
-    alert('문제 목록이 갱신되었습니다.');
+    loadJson(els.jsonInput.value);
+    alert('문제가 갱신되었습니다.');
   } catch {
     alert('JSON 형식이 잘못되었습니다.');
   }
 });
 
-els.fileJson.addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
+els.fileJson.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
   if (!file) return;
   const text = await file.text();
   try {
-    loadJsonText(text);
+    loadJson(text);
     alert('파일에서 문제를 불러왔습니다.');
   } catch {
-    alert('JSON 파일 형식이 잘못되었습니다.');
+    alert('JSON 형식이 잘못되었습니다.');
   }
 });
 
 els.btnSaveToLocal.addEventListener('click', () => {
-  localStorage.setItem('chomok_questions_backup', JSON.stringify(allQuestions));
+  localStorage.setItem(STORAGE.backup, JSON.stringify(allQuestions));
   alert('현재 문제를 로컬에 저장했습니다.');
 });
 els.btnClearLocal.addEventListener('click', () => {
-  localStorage.removeItem('chomok_questions_backup');
+  localStorage.removeItem(STORAGE.backup);
   alert('로컬 백업 삭제');
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
-  restoreProgress();
+  fillPresetOptions();
+  const optionCustom = document.createElement('option');
+  optionCustom.value = 'custom';
+  optionCustom.textContent = '직접설정';
+  els.presetSelect.appendChild(optionCustom);
 
-  const backup = localStorage.getItem('chomok_questions_backup');
+  restoreProgress();
+  const backup = localStorage.getItem(STORAGE.backup);
   if (backup) {
     try {
       const parsed = JSON.parse(backup);
-      if (Array.isArray(parsed)) {
-        allQuestions = loadIdCheckedQuestions(parsed);
-      } else if (Array.isArray(parsed?.questions)) {
-        allQuestions = loadIdCheckedQuestions(parsed.questions);
-      }
+      if (Array.isArray(parsed)) allQuestions = sanitizeQuestions(parsed);
+      else if (Array.isArray(parsed?.questions)) allQuestions = sanitizeQuestions(parsed.questions);
     } catch {}
   }
 
-  if (!allQuestions.length) {
-    await loadDefault();
-  } else {
+  loadPreset();
+
+  if (!allQuestions.length) await loadDefault();
+  else {
     els.jsonInput.value = JSON.stringify(allQuestions, null, 2);
     applyFiltersAndRender();
   }
-  updateStats();
-  markStatus();
+
+  updateStatusAndStats();
+  renderStats();
+  syncPresetState();
 });
