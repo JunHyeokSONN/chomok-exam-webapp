@@ -147,6 +147,26 @@ header p {
   padding: 1rem;
 }
 
+.question-media {
+  margin: 0.6rem 0 0;
+}
+
+.question-media img {
+  max-width: 100%;
+  width: min(100%, 760px);
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid #2d3440;
+  display: block;
+  background: #0f131c;
+}
+
+.question-media figcaption {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .options {
   display: grid;
   gap: 0.55rem;

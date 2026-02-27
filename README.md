@@ -19,6 +19,7 @@
   - `id`: 고유 ID(미입력시 자동 보정)
   - `category`: `토목기사 | 공기업 | 공무원`
   - `question`: 문제 본문
+  - `media`: 문제 이미지 경로(선택). `string` 또는 `{ src, alt, caption }`
   - `type`: `multiple` 또는 `short`, `truefalse`도 선택지 기반으로 동작
   - `options`: 보기 배열(객관식/truefalse)
   - `answer`: 정답(문항 유형에 맞게 문자열)
@@ -115,6 +116,14 @@ git push -u origin main
 3. Branch: `main`, Folder: `/ (root)`
 4. 저장 후 제공되는 Pages URL로 배포 확인
 
+
+
+### 그림 문제(응용역학/도면) 등록
+- `data.json` 또는 JSON 임포트에서 `media` 필드를 넣으면 문제 아래에 이미지가 표시됩니다.
+  - 예시(문자열): `"media": "images/응용역학_Q01.png"`
+  - 예시(객체): `"media": {"src":"images/응용역학_Q01.png", "alt":"응력선도", "caption":"그림 1. 지반 응력 분포"}`
+- 이미지는 `chomok-exam-webapp` 폴더에 상대경로로 넣어두면 바로 로드됩니다.
+- GitHub Pages 배포 시에도 같은 상대 경로가 유지되어야 하므로, `images/` 폴더를 리포에 함께 올려주세요.
 
 ## 카테고리 샘플/템플릿 생성
 - 분류별 JSON/CSV/템플릿을 한 번에 만들기:

@@ -436,6 +436,28 @@ function makeCard(q, index, total) {
   const qText = document.createElement('p');
   qText.textContent = q.question || '문항이 없습니다.';
 
+  const mediaWrap = document.createElement('figure');
+  mediaWrap.className = 'question-media';
+
+  const qImage = typeof q.image === 'string' ? q.image : (q.media && typeof q.media === 'string' ? q.media : q.image?.src || q.media?.src);
+  const qImageAlt = q.image?.alt || q.media?.alt || `${q.id || '문항'} 이미지`;
+  const qImageCaption = q.image?.caption || q.media?.caption;
+
+  if (qImage) {
+    const img = document.createElement('img');
+    img.src = qImage;
+    img.alt = qImageAlt;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    mediaWrap.appendChild(img);
+  }
+
+  if (qImageCaption) {
+    const figcap = document.createElement('figcaption');
+    figcap.textContent = qImageCaption;
+    mediaWrap.appendChild(figcap);
+  }
+
   const optionsWrap = document.createElement('div');
   optionsWrap.className = 'options';
 
@@ -500,7 +522,11 @@ function makeCard(q, index, total) {
 
   actions.append(btnCheck, btnReveal, btnClear);
 
-  card.append(h3, qText, optionsWrap, actions);
+  if (mediaWrap.children.length) {
+    card.append(h3, qText, mediaWrap, optionsWrap, actions);
+  } else {
+    card.append(h3, qText, optionsWrap, actions);
+  }
 
   const state = gradedMeta.get(key);
   if (state) applyGradeVisual(q, key, card, optionsWrap, state.isCorrect);
