@@ -6,100 +6,282 @@
   --ok: #3fb950;
   --bad: #ff4d4f;
 }
-* { box-sizing: border-box; }
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "맑은 고딕", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
   background: var(--bg);
   color: var(--text);
 }
-.wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
-header { margin-bottom: 14px; }
+
+.wrap {
+  width: min(1120px, 100% - 1.5rem);
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+header {
+  margin-bottom: 14px;
+}
+
 .toolbar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
   background: #11131a;
-  padding: 10px;
+  padding: 0.7rem;
   border-radius: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
-.toolbar label, .toolbar button, .toolbar input, .toolbar select {
+
+.toolbar label,
+.toolbar button,
+.toolbar input,
+.toolbar select,
+.toolbar .inline-check {
+  min-width: 0;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.toolbar select,
+.toolbar input,
+.toolbar button {
   width: 100%;
 }
+
 .toolbar .inline-check {
-  grid-column: span 2;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.toolbar .inline-check input {
-  width: auto;
-}
-button, select, input, textarea {
-  background: #1f2430;
-  color: #fff;
+  gap: 0.45rem;
+  padding: 0.42rem 0.5rem;
+  background: #121722;
   border: 1px solid #2d3440;
   border-radius: 8px;
-  padding: 8px 10px;
 }
-#status, #singlePos { font-weight: 700; padding: 8px 10px; }
-.timerPanel {
+
+.toolbar .inline-check input {
+  width: auto;
+  margin: 0;
+}
+
+#status,
+#singlePos {
+  font-weight: 700;
+  padding: 0.55rem 0.65rem;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  background: #171b24;
+  border: 1px solid #2d3440;
+}
+
+.timerPanel,
+.singleNav,
+.result,
+.importWrap {
   background: #141822;
   border: 1px solid #2d3440;
   border-radius: 12px;
-  padding: 10px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
+
+.timerPanel,
 .singleNav {
-  background: #141822;
-  border: 1px solid #2d3440;
-  border-radius: 12px;
-  padding: 8px;
+  padding: 0.7rem;
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
 }
+
+.singleNav {
+  justify-content: center;
+}
+
 #quizArea {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
 }
+
 .card {
   background: var(--card);
   border: 1px solid #2a2f3a;
   border-radius: 12px;
-  padding: 14px;
+  padding: 1rem;
 }
-.options { display: grid; gap: 8px; margin-top: 10px; }
+
+.options {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
 .option {
-  padding: 10px;
+  padding: 0.7rem 0.8rem;
   border: 1px solid #2d3440;
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
+  white-space: normal;
+  word-break: break-word;
 }
-.option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px #5b8cff55 inset; }
-.option.correct { border-color: var(--ok); background: #1f3a28; }
-.option.wrong { border-color: var(--bad); background: #3b1f24; }
-.actions { display: flex; gap: 8px; margin-top: 10px; }
-.result { margin-top: 14px; background: #10131a; border: 1px solid #2a2f3a; border-radius: 12px; padding: 14px; }
-.importWrap { margin-top: 14px; background: #11131a; border: 1px solid #2a2f3a; border-radius: 12px; padding: 12px; }
-textarea { width: 100%; margin-top: 8px; }
-pre { background: #0d1117; padding: 10px; border-radius: 10px; overflow: auto; }
+
+.option.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px #5b8cff55 inset;
+}
+
+.option.correct {
+  border-color: var(--ok);
+  background: #1f3a28;
+}
+
+.option.wrong {
+  border-color: var(--bad);
+  background: #3b1f24;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.actions button,
+.importWrap .actions button,
+button,
+select,
+input,
+textarea {
+  background: #1f2430;
+  color: #fff;
+  border: 1px solid #2d3440;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  min-height: 42px;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+.actions button,
+.toolbar button,
+.importWrap .actions button,
+#btnApplyPreset,
+#btnStartTest,
+#btnFinishTest,
+#btnShuffle,
+#btnReset,
+#btnRetryWrong,
+#btnCopyMarkdown,
+#btnLoadJson,
+#btnSaveToLocal,
+#btnClearLocal {
+  width: auto;
+  min-width: 95px;
+}
+
+.result {
+  padding: 1rem;
+}
+
+.importWrap {
+  padding: 0.9rem;
+}
+
+textarea {
+  width: 100%;
+  margin-top: 0.45rem;
+  min-height: 160px;
+}
+
+pre {
+  background: #0d1117;
+  padding: 0.75rem;
+  border-radius: 10px;
+  overflow: auto;
+}
+
+#wrongMarkdown {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .okText { color: var(--ok); }
 .badText { color: var(--bad); }
-ul { margin: 6px 0 0 0; padding-left: 18px; }
 
-@media (min-width: 768px) {
-  .toolbar {
-    grid-template-columns: repeat(5, 1fr) auto auto auto;
+ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+
+@media (max-width: 640px) {
+  .wrap {
+    width: calc(100% - 1rem);
+    padding-top: 0.7rem;
   }
-  .toolbar .inline-check {
-    grid-column: auto;
+
+  .toolbar {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  header h1 {
+    font-size: 1.35rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .toolbar label {
+    font-size: 0.9rem;
+  }
+
+  .singleNav,
+  .timerPanel,
+  .toolbar {
+    padding: 0.65rem;
+  }
+
+  h2,
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  #quizArea {
+    gap: 0.6rem;
+  }
+
+  .card {
+    padding: 0.75rem;
+  }
+
+  .result,
+  .importWrap {
+    padding: 0.8rem;
+  }
+
+  .actions {
+    gap: 0.45rem;
+  }
+
+  .actions button,
+  .toolbar button,
+  button,
+  select,
+  input,
+  textarea {
+    min-height: 40px;
+    padding: 0.55rem 0.7rem;
+  }
+
+  #status,
+  #singlePos {
+    width: 100%;
   }
 }
