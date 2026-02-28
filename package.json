@@ -8,6 +8,9 @@
     "start": "python -m http.server 8000",
     "ocr": "node scripts/ocr-import.js",
     "ocr:fast": "node scripts/ocr-import.js --profile fast",
-    "ocr:precision": "node scripts/ocr-import.js --profile precision"
+    "ocr:precision": "node scripts/ocr-import.js --profile precision",
+    "review:queue": "node scripts/prepare-review.js",
+    "review:apply": "node scripts/apply-review.js",
+    "review:queue-fast": "node scripts/prepare-review.js --in templates/ocr-extract.json"
   }
 }

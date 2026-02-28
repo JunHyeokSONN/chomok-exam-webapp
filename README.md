@@ -159,3 +159,27 @@ npm run ocr:precision -- <이미지경로> --id T014  # 멀티 패스 정밀 모
 ## 마무리 체크
 - `http://127.0.0.1:8000/index.html` 응답 확인
 - 채점/복기/복사 동작 확인
+
+
+## 반자동 검수(문제은행) 워크플로우(MVP)
+- 1단계: `npm run ocr:fast -- <이미지경로> --id T099 ...` 로 초안 JSON 생성
+- 2단계: `npm run review:queue -- --in templates/ocr-extract.json --out templates/review-queue.json` 로 검수 큐 생성
+- 3단계: `templates/review-queue.json`의 `status`를 `approved`로 수정(또는 `--include-pending`로 임시 반영)
+- 4단계: `npm run review:apply -- --in templates/review-queue.json --data data.json --out data.json` 로 `data.json` 반영
+
+```bash
+# 권장 패턴(검수 후 승인)
+npm run review:queue -- --in templates/ocr-extract.json --out templates/review-queue.json
+# 큐 파일 열어 status를 approved로 바꾸고
+npm run review:apply -- --in templates/review-queue.json --data data.json
+
+# 임시로 pending도 모두 반영(권장 아님)
+npm run review:apply -- --in templates/review-queue.json --data data.json --include-pending
+```
+
+```bash
+# 실행 스크립트 요약
+npm run review:queue     # OCR 초안 -> 검수 큐(문항별 metadata 포함)
+npm run review:apply     # 검수 큐를 data.json에 반영
+npm run review:queue-fast # shorthand(기본 파일 기준)
+```
