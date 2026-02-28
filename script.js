@@ -68,8 +68,10 @@ const els = {
   omrPanel: document.getElementById('omrPanel'),
   omrGrid: document.getElementById('omrGrid'),
   btnOmrNextWrong: document.getElementById('btnOmrNextWrong'),
+  btnOmrNextMark: document.getElementById('btnOmrNextMark'),
   btnOmrMarkCurrent: document.getElementById('btnOmrMarkCurrent'),
   btnOmrClearMark: document.getElementById('btnOmrClearMark'),
+  btnOmrRetryMarked: document.getElementById('btnOmrRetryMarked'),
   scoreHistoryWrap: document.getElementById('scoreHistoryWrap'),
   btnClearScore: document.getElementById('btnClearScore')
 };
@@ -197,6 +199,14 @@ function getCurrentModeLabel() {
 
 function getReviewMarkCount() {
   return reviewMarks.size;
+}
+
+
+function getCurrentMarkedIndices() {
+  return sessionQuestions
+    .map((q, idx) => ({ idx, key: qKeyFor(idx, q) }))
+    .filter((x) => reviewMarks.has(x.key))
+    .map((x) => x.idx);
 }
 
 function toggleReviewMark(idx, key) {
@@ -363,6 +373,7 @@ function stopTimer() {
   if (!timerHandle) return;
   clearInterval(timerHandle);
   timerHandle = null;
+  sessionStartAt = null;
   els.timerPanel.hidden = true;
 }
 
@@ -1021,6 +1032,18 @@ els.btnOmrNextWrong.addEventListener('click', () => {
   }
   alert('오답 문제를 찾지 못했습니다.');
 });
+els.btnOmrNextMark.addEventListener('click', () => {
+  const marked = getCurrentMarkedIndices();
+  if (!marked.length) {
+    alert('복습표시 항목이 없습니다.');
+    return;
+  }
+
+  const target = marked[0];
+  currentIndex = target;
+  renderSession();
+});
+
 els.btnOmrMarkCurrent.addEventListener('click', () => {
   const q = sessionQuestions[currentIndex];
   if (!q) return;
@@ -1030,6 +1053,20 @@ els.btnOmrClearMark.addEventListener('click', () => {
   clearReviewMarks();
   renderOmrSheet();
   updateMarkButtonLabel();
+});
+els.btnOmrRetryMarked.addEventListener('click', () => {
+  const marked = getCurrentMarkedIndices();
+  if (!marked.length) {
+    alert('복습표시 항목이 없습니다.');
+    return;
+  }
+
+  sessionQuestions = marked.map((idx) => sessionQuestions[idx]);
+  currentIndex = 0;
+  inTest = false;
+  renderSession();
+  updateStatusAndStats();
+  renderStats();
 });
 els.btnRetryWrong.addEventListener('click', () => {
   if (!wrongIds.size) {
