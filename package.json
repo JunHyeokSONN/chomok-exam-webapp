@@ -6,6 +6,8 @@
     "validate": "bash scripts/validate.sh",
     "export-categories": "node scripts/export-category-samples.js",
     "start": "python -m http.server 8000",
-    "ocr": "node scripts/ocr-import.js"
+    "ocr": "node scripts/ocr-import.js",
+    "ocr:fast": "node scripts/ocr-import.js --profile fast",
+    "ocr:precision": "node scripts/ocr-import.js --profile precision"
   }
 }

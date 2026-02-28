@@ -141,8 +141,10 @@ git push -u origin main
 npm run start             # 로컬 정적 서버 실행(8000)
 npm run validate          # 문법/데이터/템플릿 체크
 npm run export-categories # 분류별 JSON/CSV 템플릿 재생성
-npm run ocr -- <이미지경로> [--id T014] [--category 토목기사] [--difficulty hard] [--psm 6,11,12] [--scale 2]
+npm run ocr -- <이미지경로> [--id T014] [--category 토목기사] [--difficulty hard] [--psm 6,11,12] [--scale 2] [--profile precision|fast|custom]
                           # 단발성 OCR 판독 -> templates/ocr-extract.json 또는 --out 지정
+npm run ocr:fast -- <이미지경로> --id T014   # 빠른 단일 패스
+npm run ocr:precision -- <이미지경로> --id T014  # 멀티 패스 정밀 모드(시간 증가)
 ```
 
 ### OCR 판독 가이드
