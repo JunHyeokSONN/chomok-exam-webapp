@@ -4,7 +4,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const args = process.argv.slice(2);
-if (args.length === 0) {
+if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
   console.log(`
 Usage:
   node scripts/ocr-import.js <imagePath> [--out <jsonPath>] [--id <문항ID>] [--category <카테고리>] [--difficulty <난이도>] [--psm <숫자,콤마분리>] [--scale <배율>] [--profile <fast|precision|custom>]
@@ -21,7 +21,7 @@ Options:
 Example:
   npm run ocr -- images/raw/14.jpg --id T014 --category 토목기사 --difficulty hard --profile precision
 `);
-  process.exit(1);
+  process.exit(args.length === 0 ? 1 : 0);
 }
 
 const PROFILE = {
@@ -47,25 +47,118 @@ const opts = {
   profile: 'precision'
 };
 
-let imagePath = null;
+let imageArg = null;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a.startsWith('--')) {
     const key = a.replace(/^--/, '');
     if (['out', 'id', 'category', 'difficulty', 'psm', 'scale', 'profile'].includes(key)) {
       if (i + 1 >= args.length) {
-        throw new Error(`옵션 ${a} 값이 없습니다.`);
+        abort(`옵션 ${a} 값이 없습니다.`);
       }
       opts[key] = args[i + 1];
       i += 1;
     }
     continue;
   }
-  if (!imagePath) imagePath = a;
+  if (!imageArg) imageArg = a;
 }
 
-if (!imagePath) throw new Error('이미지 경로가 필요합니다.');
-if (!fs.existsSync(imagePath)) throw new Error(`이미지 파일이 없습니다: ${imagePath}`);
+const imagePath = resolveImagePath(imageArg);
+
+function abort(message) {
+  console.log(`Error: ${message}`);
+  process.exit(1);
+}
+
+normalizeOptions();
+
+function resolveImagePath(raw) {
+  if (!raw) {
+    abort('이미지 경로가 필요합니다.');
+  }
+
+  const candidates = new Set();
+
+  // 일부 로그에서 별표 마스킹/패턴이 섞인 입력이 들어오는 경우도 대응
+  const normalizedRaw = String(raw).trim().replace(/\*{2,}/g, '*');
+
+  const cwd = process.cwd();
+  const home = process.env.HOME || '';
+
+  // 1) 그대로 입력값 자체
+  candidates.add(normalizedRaw);
+
+  // 2) 경로 보정
+  candidates.add(path.normalize(normalizedRaw));
+  candidates.add(path.resolve(cwd, normalizedRaw));
+  candidates.add(path.join(home, '.openclaw', normalizedRaw));
+  candidates.add(path.join(home, '.openclaw', 'media', normalizedRaw));
+  candidates.add(path.join(home, '.openclaw', 'media', 'inbound', normalizedRaw));
+
+  // 3) 절대 경로가 아니고 파일명만 들어온 경우: 자주 쓰는 위치로 보정
+  const fileName = path.basename(normalizedRaw);
+  candidates.add(path.join(cwd, 'media', fileName));
+  candidates.add(path.join(home, '.openclaw', 'media', 'inbound', fileName));
+  candidates.add(path.join(cwd, '..', 'media', 'inbound', fileName));
+
+  // 4) wildcard 처리(
+  //   예: ".../media/inbound/abc*.png"
+  if (/[\*\?\[]/.test(normalizedRaw)) {
+    const m = normalizedRaw.split('/').slice(0, -1);
+    const pattern = normalizedRaw.includes('/') ? normalizedRaw.split('/').at(-1) : normalizedRaw;
+    const dir = m.length ? path.resolve(m.join('/')) : cwd;
+    if (fs.existsSync(dir)) {
+      const list = fs.readdirSync(dir);
+      const regex = globToRegExp(pattern);
+      const found = list.filter((f) => regex.test(f));
+      for (const f of found) candidates.add(path.join(dir, f));
+    }
+  }
+
+  for (const c of candidates) {
+    const p = String(c);
+    if (!p) continue;
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+      return path.resolve(p);
+    }
+  }
+
+  // 마지막 대체: 후보 폴더에서 파일명 유사도 기반 1차 추천
+  const fallbackDirs = [
+    path.join(home, '.openclaw', 'media', 'inbound'),
+    path.join(home, '.openclaw', 'media'),
+    path.join(cwd, 'media'),
+    path.join(cwd, '..', 'media', 'inbound')
+  ];
+  const similar = [];
+  for (const d of fallbackDirs) {
+    if (fs.existsSync(d) && fs.statSync(d).isDirectory()) {
+      const list = fs.readdirSync(d).filter((f) => /\.(png|jpg|jpeg|bmp|webp|heic|gif)$/i.test(f));
+      for (const f of list) {
+        if (f.includes(fileName) || fileName.includes(path.parse(f).name)) {
+          similar.push(path.join(d, f));
+          if (similar.length >= 5) break;
+        }
+      }
+    }
+    if (similar.length) break;
+  }
+
+  const tips = similar.length
+    ? `\n  후보 경로: ${similar.slice(0, 5).join('\n            ')}`
+    : '';
+
+  abort(`이미지 파일을 찾을 수 없습니다: ${normalizedRaw}${tips}`);
+}
+
+function globToRegExp(pattern) {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`);
+}
 
 function normalizeOptions() {
   const profile = PROFILE[opts.profile] || PROFILE.precision;
@@ -76,8 +169,6 @@ function normalizeOptions() {
   const s = Number.parseInt(opts.scale, 10);
   if (!Number.isInteger(s) || s < 1 || s > 6) opts.scale = profile.scale;
 }
-
-normalizeOptions();
 
 const runtime = {
   profile: opts.profile,
@@ -108,7 +199,15 @@ function maybeCopyImage() {
   const imagesDir = ensureFolder(path.join(process.cwd(), 'images'));
   const fileName = path.basename(imagePath);
   const target = path.join(imagesDir, fileName);
-  if (!fs.existsSync(target)) fs.copyFileSync(imagePath, target);
+  if (!fs.existsSync(target)) {
+    try {
+      fs.copyFileSync(imagePath, target);
+    } catch (e) {
+      // fallback: write in current directory if images directory 권한 문제가 나도 스킵
+      console.log(`⚠️ 이미지 복사 실패(${e.message}); 원본 경로를 그대로 사용합니다.`);
+      return path.relative(process.cwd(), imagePath);
+    }
+  }
   return `images/${fileName}`;
 }
 
