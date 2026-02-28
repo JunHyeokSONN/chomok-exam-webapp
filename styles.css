@@ -520,3 +520,23 @@ button:hover,
   color: #9bb4ff;
   font-weight: 600;
 }
+
+
+.subsetHistory {
+  margin-top: 0.45rem;
+  padding: 0.45rem;
+  border: 1px solid #273146;
+  border-radius: 8px;
+  background: #0f141c;
+  min-height: 1.2rem;
+}
+
+.subsetHistory .item {
+  font-size: 0.92rem;
+  color: #b7c1d2;
+  margin: 0.16rem 0;
+}
+
+.subsetHistory .muted {
+  color: var(--muted);
+}

@@ -53,6 +53,7 @@ const els = {
   resultBox: document.getElementById('resultBox'),
   scoreText: document.getElementById('scoreText'),
   resultSummary: document.getElementById('resultSummary'),
+  subsetHistory: document.getElementById('subsetHistory'),
   statsByDiff: document.getElementById('statsByDiff'),
   wrongMarkdown: document.getElementById('wrongMarkdown'),
   btnRetryWrong: document.getElementById('btnRetryWrong'),
@@ -90,13 +91,15 @@ let wrongIds = new Set();
 let reviewMarks = new Set();
 let sessionStartAt = null;
 let scoreHistory = [];
+let subsetHistory = [];
 let currentSessionMeta = { kind: 'normal', label: '', totalTarget: 0, subsetType: null, subsetTarget: 0 };
 
 const STORAGE = {
   progress: 'chomok_progress',
   backup: 'chomok_questions_backup',
   preset: 'chomok_preset',
-  scoreHistory: 'chomok_score_history'
+  scoreHistory: 'chomok_score_history',
+  subsetHistory: 'chomok_subset_history'
 };
 
 function qKeyFor(idx, q) {
@@ -938,7 +941,20 @@ function computeFinalResult({ auto = false } = {}) {
   if (auto) alert('시간 종료! 자동 채점합니다.');
 
   const isSubset = isSubsetSession();
-  if (!isSubset && (els.modeSelect.value === 'test' || inTest)) {
+  if (isSubset) {
+    saveSubsetHistory({
+      at: new Date().toISOString(),
+      total,
+      answered: right,
+      wrong,
+      percent,
+      elapsedSec: elapsed,
+      subsetType: currentSessionMeta.subsetType || 'subset',
+      mode: els.modeSelect.value,
+      viewMode: els.viewMode.value,
+      target: currentSessionMeta.totalTarget || total
+    });
+  } else if (els.modeSelect.value === 'test' || inTest) {
     const record = {
       at: new Date().toISOString(),
       total,
@@ -960,6 +976,7 @@ function computeFinalResult({ auto = false } = {}) {
   els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
   renderStats();
   renderResultSummary({ right, total, wrong, percent, elapsed });
+  renderSubsetHistory();
   revealWrongPanel();
   els.resultBox.hidden = false;
   applySessionChrome();
@@ -1026,6 +1043,43 @@ function loadScoreHistory() {
     scoreHistory = [];
   }
   return scoreHistory;
+}
+
+function renderSubsetHistory() {
+  if (!els.subsetHistory) return;
+  if (!subsetHistory.length) {
+    els.subsetHistory.innerHTML = '<p class="muted">재풀이 기록이 없습니다.</p>';
+    return;
+  }
+
+  const rows = subsetHistory.slice(0, 8).map((r) => {
+    const elapsed = r.elapsedSec || 0;
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const ss = String(elapsed % 60).padStart(2, '0');
+    const d = r.at ? new Date(r.at).toLocaleString('ko-KR') : '-';
+    const modeName = r.subsetType === 'review' ? '복습표시' : (r.subsetType === 'wrong' ? '오답' : '재풀이');
+    return `<div class="item">${d} · ${modeName} ${r.answered}/${r.total} (${r.percent}%) · 시간 ${mm}:${ss}</div>`;
+  }).join('');
+
+  els.subsetHistory.innerHTML = rows;
+}
+
+function loadSubsetHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE.subsetHistory);
+    subsetHistory = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw) : [];
+  } catch {
+    subsetHistory = [];
+  }
+  return subsetHistory;
+}
+
+function saveSubsetHistory(record) {
+  const list = loadSubsetHistory();
+  list.unshift(record);
+  subsetHistory = list.slice(0, 20);
+  localStorage.setItem(STORAGE.subsetHistory, JSON.stringify(subsetHistory));
+  renderSubsetHistory();
 }
 
 function renderScoreHistory() {
@@ -1278,10 +1332,13 @@ els.fileJson.addEventListener('change', async (e) => {
 });
 
 els.btnClearScore.addEventListener('click', () => {
-  if (!confirm('성적 기록을 초기화할까요?')) return;
+  if (!confirm('기록을 초기화할까요?')) return;
   scoreHistory = [];
+  subsetHistory = [];
   localStorage.removeItem(STORAGE.scoreHistory);
+  localStorage.removeItem(STORAGE.subsetHistory);
   renderScoreHistory();
+  renderSubsetHistory();
 });
 
 els.btnSaveToLocal.addEventListener('click', () => {
@@ -1313,6 +1370,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadPreset();
   loadScoreHistory();
   renderScoreHistory();
+  loadSubsetHistory();
+  renderSubsetHistory();
   loadReviewMarks();
   setSubsetSessionMeta({ kind: 'normal', label: '', totalTarget: 0, subsetType: null, subsetTarget: 0, inLearningMode: false });
   applySessionChrome();
