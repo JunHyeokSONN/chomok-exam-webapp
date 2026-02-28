@@ -6,10 +6,14 @@ const els = {
   statusFilter: document.getElementById('statusFilter'),
   btnApproveAll: document.getElementById('btnApproveAll'),
   btnRejectAll: document.getElementById('btnRejectAll'),
+  btnApproveChecked: document.getElementById('btnApproveChecked'),
+  btnRejectChecked: document.getElementById('btnRejectChecked'),
   btnExportQueue: document.getElementById('btnExportQueue'),
   btnExportData: document.getElementById('btnExportData'),
   btnPrevItem: document.getElementById('btnPrevItem'),
   btnNextItem: document.getElementById('btnNextItem'),
+  btnSelectAllVisible: document.getElementById('btnSelectAllVisible'),
+  btnClearSelection: document.getElementById('btnClearSelection'),
   summary: document.getElementById('summary'),
   reviewList: document.getElementById('reviewList'),
   modal: document.getElementById('imgModal'),
@@ -20,6 +24,50 @@ const els = {
 let queue = null;
 let baseData = null;
 let activeQueueIdx = -1;
+const selectedQueueIdxs = new Set();
+
+function normText(v) {
+  return String(v || '').trim();
+}
+
+function normalizeAutoText(raw) {
+  const s = normText(raw)
+    .normalize('NFKC')
+    .replace(/[−–—]/g, '-')
+    .replace(/×/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/\s*\.\s*/g, '.')
+    .replace(/\s*\+\s*/g, '+')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s*\*\s*/g, '*')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return s
+    .replace(/\b(kgf\s*\/\s*cm2|kgf\s*cm2)\b/gi, 'kgf/cm2')
+    .replace(/\b(㎠)\b/g, 'cm2')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')');
+}
+
+function parseOptionLines(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [''];
+  return String(raw)
+    .split('\n')
+    .map((s) => normText(s))
+    .filter((s) => s.length > 0);
+}
+
+function toOptionText(raw) {
+  return Array.isArray(raw) ? raw.join('\n') : normText(raw);
+}
+
+function getQuestionId(q, index) {
+  const id = normText(q.id || `Q_${index + 1}`);
+  return id || `Q_${index + 1}`;
+}
 
 function normalizeQueue(json) {
   const payload = json || {};
@@ -42,56 +90,19 @@ function normalizeQueue(json) {
   };
 }
 
-function normText(v) {
-  return String(v || '').trim();
-}
-
-function toOptionText(raw) {
-  if (Array.isArray(raw)) return raw.join('\n');
-  return normText(raw);
-}
-
-function parseOptionLines(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (!raw) return [''];
-  return String(raw)
-    .split('\n')
-    .map((s) => normText(s))
-    .filter((s) => s.length > 0);
-}
-
-function getQuestionId(q, index) {
-  const id = normText(q.id || `Q_${index + 1}`);
-  return id || `Q_${index + 1}`;
-}
-
-function setActiveByVisibleIndex(idx) {
-  if (!queue) return;
-  const arr = getVisibleQueueItems();
-  if (arr.length === 0) {
-    activeQueueIdx = -1;
-    return;
-  }
-  const safe = Math.max(0, Math.min(idx, arr.length - 1));
-  activeQueueIdx = arr[safe].index;
-  renderQueue();
-  const target = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
-  target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function getImageSrc(media) {
+  if (!media) return '';
+  if (typeof media === 'string') return media;
+  if (typeof media === 'object' && media.src) return media.src;
+  return '';
 }
 
 function getVisibleQueueItems() {
   if (!queue) return [];
   const mode = els.statusFilter.value || 'all';
   return queue.items
-    .map((item, idx) => ({ item, index: idx, ...item }))
-    .filter(({ status }) => mode === 'all' || (status || 'pending') === mode);
-}
-
-function getImageSrc(media) {
-  if (!media) return '';
-  if (typeof media === 'string') return media;
-  if (typeof media === 'object' && media.src) return media.src;
-  return '';
+    .map((item, idx) => ({ item, index: idx }))
+    .filter(({ item }) => mode === 'all' || (item.status || 'pending') === mode);
 }
 
 function renderSummary() {
@@ -100,7 +111,7 @@ function renderSummary() {
     return;
   }
 
-  const statuses = queue.items.reduce(
+  const counts = queue.items.reduce(
     (acc, item) => {
       const s = item.status || 'pending';
       acc[s] = (acc[s] || 0) + 1;
@@ -109,86 +120,55 @@ function renderSummary() {
     { pending: 0, approved: 0, rejected: 0 }
   );
 
-  els.summary.innerHTML = `
-    <strong>배치:</strong> ${normText(queue.batchId)} |
-    <strong>생성시각:</strong> ${normText(queue.generatedAt)} |
-    <strong>전체:</strong> ${queue.items.length} 건 |
-    승인 ${statuses.approved || 0} / 대기 ${statuses.pending || 0} / 반려 ${statuses.rejected || 0}
-  `;
+  const sel = selectedQueueIdxs.size;
+  els.summary.innerHTML = `<strong>배치:</strong> ${normText(queue.batchId)} | <strong>생성시각:</strong> ${normText(queue.generatedAt)} | <strong>전체:</strong> ${queue.items.length}건 | 승인 ${counts.approved || 0} / 대기 ${counts.pending || 0} / 반려 ${counts.rejected || 0} | 선택 ${sel}건`;
 }
 
-function applyCardToQueue(queueIdx, refs) {
-  const item = queue.items[queueIdx];
-  if (!item) return;
-
-  const {
-    statusSel,
-    idInput,
-    typeSel,
-    catInput,
-    diffSel,
-    questionInput,
-    optsInput,
-    answerInput,
-    expInput,
-    statusText,
-    state
-  } = refs;
-
-  item.status = statusSel.value;
-  const q = item.question || (item.question = {});
-  q.id = normText(idInput.value) || getQuestionId(q, queueIdx);
-  q.type = typeSel.value;
-  q.category = normText(catInput.value) || '토목기사';
-  q.difficulty = diffSel.value || 'normal';
-  q.question = questionInput.value || '';
-  q.options = parseOptionLines(optsInput.value);
-  q.answer = normText(answerInput.value);
-  q.explanation = normText(expInput.value) || '해설을 확인해 주세요.';
-  item.question = q;
-
-  statusText.textContent = item.status === 'approved' ? '승인' : item.status === 'rejected' ? '반려' : '대기';
-  state.dataset.status = item.status;
-
-  renderSummary();
+function renderCheckboxState(card, queueIdx) {
+  const cb = card.querySelector('.reviewSelect');
+  if (!cb) return;
+  cb.checked = selectedQueueIdxs.has(queueIdx);
 }
 
-function createReviewCard(item, queueIdx, isActive, visibleIndex) {
+function createReviewCard(item, queueIdx, isActive) {
   const status = item.status || 'pending';
   const q = item.question || {};
 
   const card = document.createElement('section');
   card.className = 'reviewCard';
-  card.dataset.idx = queueIdx;
-  card.dataset.visible = visibleIndex;
+  card.dataset.idx = String(queueIdx);
   card.dataset.active = String(isActive);
 
   const header = document.createElement('div');
   header.className = 'reviewHeader';
 
-  const left = document.createElement('div');
-  left.innerHTML = `<strong>Queue:</strong> ${normText(item.queueId)} / <strong>sourceId:</strong> ${normText(item.sourceId)} / <strong>원본:</strong> ${normText(item.sourcePath || q._sourceId)}`;
+  const topLeft = document.createElement('div');
+  const selWrap = document.createElement('label');
+  const sel = document.createElement('input');
+  sel.type = 'checkbox';
+  sel.className = 'reviewSelect';
+  sel.checked = selectedQueueIdxs.has(queueIdx);
+  sel.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (sel.checked) selectedQueueIdxs.add(queueIdx);
+    else selectedQueueIdxs.delete(queueIdx);
+    renderSummary();
+  });
+  selWrap.textContent = '선택';
+  selWrap.append(' ', sel);
+  topLeft.append(selWrap);
+
+  const metaText = document.createElement('div');
+  metaText.innerHTML = `<strong>Queue:</strong> ${normText(item.queueId)} / <strong>sourceId:</strong> ${normText(item.sourceId)} / <strong>원본:</strong> ${normText(item.sourceId)}`;
+
+  topLeft.append(' ', metaText);
 
   const statusText = document.createElement('span');
   statusText.className = 'reviewStatus';
   statusText.dataset.status = status;
   statusText.textContent = status === 'approved' ? '승인' : status === 'rejected' ? '반려' : '대기';
 
-  header.append(left, statusText);
-
-  const media = document.createElement('figure');
-  media.className = 'miniFigure';
-
-  const mediaSrc = getImageSrc(q.media);
-  if (mediaSrc) {
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.src = mediaSrc;
-    img.alt = normText(q.id || item.sourceId || `문제 ${queueIdx + 1} 이미지`);
-    img.addEventListener('click', () => openModal(mediaSrc));
-    media.appendChild(img);
-    card.appendChild(media);
-  }
+  header.append(topLeft, statusText);
 
   const field = document.createElement('div');
   field.className = 'fieldGrid';
@@ -248,6 +228,49 @@ function createReviewCard(item, queueIdx, isActive, visibleIndex) {
   expInput.rows = 3;
   expInput.value = normText(q.explanation || '해설을 확인해 주세요.');
 
+  const mediaSrc = getImageSrc(q.media);
+  if (mediaSrc) {
+    const figure = document.createElement('figure');
+    figure.className = 'miniFigure';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = mediaSrc;
+    img.alt = normText(q.id || item.sourceId || `문제 ${queueIdx + 1} 이미지`);
+    img.addEventListener('click', () => openModal(mediaSrc));
+    figure.appendChild(img);
+    field.appendChild(figure);
+  }
+
+  const autoBtn = document.createElement('button');
+  autoBtn.type = 'button';
+  autoBtn.textContent = '자동 보정 적용';
+  autoBtn.addEventListener('click', () => {
+    questionInput.value = normalizeAutoText(questionInput.value);
+    optsInput.value = parseOptionLines(optsInput.value).map((x) => normalizeAutoText(x)).join('\n');
+    answerInput.value = normalizeAutoText(answerInput.value);
+    expInput.value = normalizeAutoText(expInput.value);
+  });
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.textContent = '현재 항목 적용';
+  saveBtn.addEventListener('click', () => {
+    applyCardToQueue(queueIdx, {
+      statusSel,
+      idInput,
+      typeSel,
+      catInput,
+      diffSel,
+      questionInput,
+      optsInput,
+      answerInput,
+      expInput,
+      statusText
+    });
+    activeQueueIdx = queueIdx;
+    renderQueue();
+  });
+
   const meta = item.ocr || item._ocrMeta || {};
   const metaBox = document.createElement('details');
   const metaSummary = document.createElement('summary');
@@ -268,20 +291,6 @@ function createReviewCard(item, queueIdx, isActive, visibleIndex) {
   );
   metaBox.append(metaSummary, metaPre);
 
-  const saveBtn = document.createElement('button');
-  saveBtn.textContent = '현재 항목 적용';
-  saveBtn.type = 'button';
-
-  const refs = { statusSel, statusText, idInput, typeSel, catInput, diffSel, questionInput, optsInput, answerInput, expInput, state: statusText };
-  saveBtn.addEventListener('click', () => {
-    applyCardToQueue(queueIdx, refs);
-  });
-
-  card.addEventListener('click', () => {
-    activeQueueIdx = queueIdx;
-    renderQueue();
-  });
-
   field.append(
     mk('상태', statusSel),
     mk('문항 ID', idInput),
@@ -292,12 +301,65 @@ function createReviewCard(item, queueIdx, isActive, visibleIndex) {
     mk('보기 입력 (한 줄=1개)', optsInput),
     mk('정답', answerInput),
     mk('해설', expInput),
+    autoBtn,
     saveBtn,
     metaBox
   );
 
   card.append(header, field);
+
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea')) return;
+    activeQueueIdx = queueIdx;
+    renderQueue();
+  });
+
   return card;
+}
+
+function applyCardToQueue(queueIdx, refs) {
+  const item = queue.items[queueIdx];
+  if (!item || !refs) return;
+
+  const { statusSel, idInput, typeSel, catInput, diffSel, questionInput, optsInput, answerInput, expInput, statusText } = refs;
+  const q = item.question || (item.question = {});
+
+  item.status = statusSel.value;
+  q.id = normText(idInput.value) || getQuestionId(q, queueIdx);
+  q.type = typeSel.value || 'multiple';
+  q.category = normText(catInput.value) || '토목기사';
+  q.difficulty = diffSel.value || 'normal';
+  q.question = normText(questionInput.value);
+  q.options = parseOptionLines(optsInput.value);
+  q.answer = normText(answerInput.value);
+  q.explanation = normText(expInput.value) || '해설을 확인해 주세요.';
+  item.question = q;
+
+  statusText.dataset.status = item.status;
+  statusText.textContent = item.status === 'approved' ? '승인' : item.status === 'rejected' ? '반려' : '대기';
+  renderSummary();
+}
+
+function getCardRefs(queueIdx) {
+  const card = document.querySelector(`.reviewCard[data-idx="${queueIdx}"]`);
+  if (!card) return null;
+
+  const selects = card.querySelectorAll('select');
+  const inputs = card.querySelectorAll('input');
+  const textareas = card.querySelectorAll('textarea');
+
+  return {
+    statusSel: selects[0] || null,
+    idInput: inputs[1] || null, // 0: checkbox
+    typeSel: selects[1] || null,
+    catInput: inputs[2] || null,
+    diffSel: selects[2] || null,
+    questionInput: textareas[0] || null,
+    optsInput: textareas[1] || null,
+    answerInput: inputs[3] || null,
+    expInput: textareas[2] || null,
+    statusText: card.querySelector('.reviewStatus')
+  };
 }
 
 function renderQueue() {
@@ -305,7 +367,6 @@ function renderQueue() {
   els.reviewList.innerHTML = '';
 
   const visible = getVisibleQueueItems();
-
   if (visible.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'reviewCard';
@@ -315,17 +376,108 @@ function renderQueue() {
     return;
   }
 
-  if (activeQueueIdx < 0 || !queue.items[activeQueueIdx]) {
+  const activePos = visible.findIndex(({ index }) => index === activeQueueIdx);
+  if (activePos < 0) {
     activeQueueIdx = visible[0].index;
   }
 
-  visible.forEach(({ item, index }, visibleIndex) => {
+  visible.forEach(({ item, index }) => {
     const isActive = index === activeQueueIdx;
-    const card = createReviewCard(item, index, isActive, visibleIndex);
+    const card = createReviewCard(item, index, isActive);
     els.reviewList.appendChild(card);
+    renderCheckboxState(card, index);
   });
 
+  const activeCard = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+  activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
   renderSummary();
+}
+
+function saveActiveAndMaybeMove(step) {
+  if (activeQueueIdx < 0 || !queue) return;
+
+  const refs = getCardRefs(activeQueueIdx);
+  applyCardToQueue(activeQueueIdx, refs);
+
+  const visible = getVisibleQueueItems();
+  const activePos = visible.findIndex(({ index }) => index === activeQueueIdx);
+  if (activePos === -1) return;
+
+  const nextPos = Math.max(0, Math.min(visible.length - 1, activePos + step));
+  activeQueueIdx = visible[nextPos].index;
+  renderQueue();
+}
+
+function setStatusForActive(nextStatus) {
+  if (!queue || activeQueueIdx < 0) return;
+  const item = queue.items[activeQueueIdx];
+  if (!item) return;
+
+  item.status = nextStatus;
+
+  const refs = getCardRefs(activeQueueIdx);
+  if (refs?.statusSel) refs.statusSel.value = nextStatus;
+  if (refs?.statusText) {
+    refs.statusText.dataset.status = nextStatus;
+    refs.statusText.textContent = nextStatus === 'approved' ? '승인' : nextStatus === 'rejected' ? '반려' : '대기';
+  }
+  renderSummary();
+}
+
+function bindKeyboardShortcuts(e) {
+  if (!queue || queue.items.length === 0) return;
+
+  const tag = e.target?.tagName?.toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag)) return;
+
+  if (e.key === ']' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    saveActiveAndMaybeMove(1);
+    return;
+  }
+  if (e.key === '[' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    saveActiveAndMaybeMove(-1);
+    return;
+  }
+  if (e.key === '1') {
+    e.preventDefault();
+    setStatusForActive('approved');
+    return;
+  }
+  if (e.key === '0') {
+    e.preventDefault();
+    setStatusForActive('rejected');
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+    const btn = card?.querySelector('button:last-of-type');
+    btn?.click();
+    return;
+  }
+  if (e.key.toLowerCase() === 'n') {
+    e.preventDefault();
+    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+    const btn = card?.querySelector('button:last-of-type');
+    btn?.click();
+    saveActiveAndMaybeMove(1);
+  }
+}
+
+function openModal(src) {
+  if (!src) return;
+  els.modalImg.src = src;
+  els.modal.classList.add('open');
+  els.modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal() {
+  els.modal.classList.remove('open');
+  els.modal.setAttribute('aria-hidden', 'true');
+  els.modalImg.removeAttribute('src');
 }
 
 function buildExportQueue() {
@@ -356,13 +508,18 @@ function ensureQuestionHasId(q, idx) {
 }
 
 function mergeApprovedData(data, queueItems) {
-  const merged = Array.isArray(data?.questions) ? [...data.questions] : Array.isArray(data) ? [...data] : [];
+  const merged = Array.isArray(data?.questions)
+    ? [...data.questions]
+    : Array.isArray(data)
+      ? [...data]
+      : [];
   const used = new Set(merged.map((q) => String(q.id || '')));
 
   let idx = 0;
   queueItems.forEach((item) => {
     if ((item.status || 'pending') !== 'approved') return;
     const q = { ...(item.question || {}) };
+
     if (!q.id) q.id = `R${String(++idx).padStart(3, '0')}`;
     if (used.has(q.id)) {
       let n = 2;
@@ -370,6 +527,7 @@ function mergeApprovedData(data, queueItems) {
       while (used.has(`${base}_${n}`)) n += 1;
       q.id = `${base}_${n}`;
     }
+
     ensureQuestionHasId(q, merged.length + idx);
     used.add(q.id);
 
@@ -384,129 +542,6 @@ function mergeApprovedData(data, queueItems) {
   return { questions: merged };
 }
 
-function openModal(src) {
-  if (!src) return;
-  els.modalImg.src = src;
-  els.modal.classList.add('open');
-  els.modal.setAttribute('aria-hidden', 'false');
-}
-
-function closeModal() {
-  els.modal.classList.remove('open');
-  els.modal.setAttribute('aria-hidden', 'true');
-  els.modalImg.removeAttribute('src');
-}
-
-function saveActiveAndMaybeMove(step) {
-  if (activeQueueIdx < 0 || !queue) return;
-  const item = queue.items[activeQueueIdx];
-  if (!item) return;
-
-  const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
-  if (!card) return;
-
-  const all = card.querySelectorAll('select, input, textarea, button');
-  const controls = Array.from(all);
-  const refs = {
-    statusSel: controls.find((c) => c.tagName === 'SELECT' && c.previousSibling?.textContent === '상태') || card.querySelector('select'),
-    statusText: card.querySelector('.reviewStatus'),
-    idInput: Array.from(card.querySelectorAll('input')).find((el) => el.previousSibling?.textContent === '문항 ID') || card.querySelector('input'),
-    typeSel: card.querySelectorAll('select')[1] || card.querySelector('select'),
-    catInput: Array.from(card.querySelectorAll('input'))[1],
-    diffSel: card.querySelectorAll('select')[2],
-    questionInput: card.querySelector('textarea'),
-    optsInput: card.querySelectorAll('textarea')[1],
-    answerInput: Array.from(card.querySelectorAll('input')).find((el) => el !== card.querySelector('input') && !Number.isNaN(Number(el.value))) || card.querySelectorAll('input')[1],
-    expInput: card.querySelectorAll('textarea')[2]
-  };
-  applyCardToQueue(activeQueueIdx, {
-    statusSel: item.status ? refs.statusSel : (card.querySelectorAll('select')[0] || card.querySelector('select')),
-    statusText: refs.statusText,
-    idInput: refs.idInput,
-    typeSel: refs.typeSel,
-    catInput: refs.catInput,
-    diffSel: refs.diffSel,
-    questionInput: refs.questionInput,
-    optsInput: refs.optsInput,
-    answerInput: refs.answerInput,
-    expInput: refs.expInput
-  });
-
-  const visible = getVisibleQueueItems();
-  const activePosition = visible.findIndex((v) => v.index === activeQueueIdx);
-  if (activePosition === -1) return;
-  let nextPos = activePosition + step;
-  if (nextPos < 0) nextPos = 0;
-  if (nextPos > visible.length - 1) nextPos = visible.length - 1;
-  activeQueueIdx = visible[nextPos].index;
-  renderQueue();
-}
-
-function setStatusForActive(nextStatus) {
-  if (!queue || activeQueueIdx < 0) return;
-  const item = queue.items[activeQueueIdx];
-  if (!item) return;
-  item.status = nextStatus;
-
-  const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
-  if (card) {
-    const statusSel = card.querySelector('select');
-    const statusText = card.querySelector('.reviewStatus');
-    if (statusSel) statusSel.value = nextStatus;
-    if (statusText) {
-      statusText.dataset.status = nextStatus;
-      statusText.textContent = nextStatus === 'approved' ? '승인' : nextStatus === 'rejected' ? '반려' : '대기';
-    }
-  }
-  renderSummary();
-}
-
-function bindKeyboardShortcuts(e) {
-  if (!queue || queue.items.length === 0) return;
-
-  const tag = e.target?.tagName?.toLowerCase();
-  if (['input', 'textarea', 'select'].includes(tag)) return;
-
-  if (e.key === ']' || e.key === 'ArrowRight') {
-    e.preventDefault();
-    saveActiveAndMaybeMove(1);
-    return;
-  }
-  if (e.key === '[' || e.key === 'ArrowLeft') {
-    e.preventDefault();
-    saveActiveAndMaybeMove(-1);
-    return;
-  }
-
-  if (e.key === '1') {
-    e.preventDefault();
-    setStatusForActive('approved');
-    return;
-  }
-
-  if (e.key === '0') {
-    e.preventDefault();
-    setStatusForActive('rejected');
-    return;
-  }
-
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
-    const save = card?.querySelector('button');
-    save?.click();
-    return;
-  }
-
-  if (e.key.toLowerCase() === 'n') {
-    e.preventDefault();
-    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
-    const save = card?.querySelector('button');
-    save?.click();
-    saveActiveAndMaybeMove(1);
-  }
-}
-
 async function readJsonFromFile(file) {
   const text = await file.text();
   return JSON.parse(text);
@@ -516,10 +551,21 @@ async function loadQueueFromPath(path) {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`큐 로드 실패: ${path}`);
   const data = await res.json();
+
   queue = normalizeQueue(data);
-  queue.items = queue.items.map((item) => ({ status: 'pending', ...item }));
+  queue.items = queue.items.map((item) => ({ status: item.status || 'pending', ...item }));
+  selectedQueueIdxs.clear();
   activeQueueIdx = -1;
   renderSummary();
+  renderQueue();
+}
+
+function applyStatusToTargets(status) {
+  if (!queue?.items?.length) return;
+  const targets = selectedQueueIdxs.size ? Array.from(selectedQueueIdxs) : getVisibleQueueItems().map((x) => x.index);
+  targets.forEach((idx) => {
+    if (queue.items[idx]) queue.items[idx].status = status;
+  });
   renderQueue();
 }
 
@@ -531,10 +577,11 @@ function bindEvents() {
       const data = await readJsonFromFile(file);
       queue = normalizeQueue(data);
       queue.items = queue.items.map((item) => ({ status: 'pending', ...item }));
+      selectedQueueIdxs.clear();
       activeQueueIdx = -1;
       renderSummary();
       renderQueue();
-      els.queueFile.value = '';
+      e.target.value = '';
     } catch {
       alert('큐 파일 형식이 잘못되었습니다.');
     }
@@ -546,7 +593,7 @@ function bindEvents() {
     try {
       baseData = await readJsonFromFile(file);
       alert('data.json 로드 완료');
-      els.dataFile.value = '';
+      e.target.value = '';
     } catch {
       alert('data.json 형식이 잘못되었습니다.');
     }
@@ -582,10 +629,20 @@ function bindEvents() {
     renderQueue();
   });
 
+  els.btnApproveChecked.addEventListener('click', () => applyStatusToTargets('approved'));
+  els.btnRejectChecked.addEventListener('click', () => applyStatusToTargets('rejected'));
+  els.btnSelectAllVisible.addEventListener('click', () => {
+    getVisibleQueueItems().forEach(({ index }) => selectedQueueIdxs.add(index));
+    renderQueue();
+  });
+  els.btnClearSelection.addEventListener('click', () => {
+    selectedQueueIdxs.clear();
+    renderQueue();
+  });
+
   els.btnExportQueue.addEventListener('click', () => {
     if (!queue) return alert('큐가 없습니다.');
-    const payload = buildExportQueue();
-    downloadJson(`review-export-${Date.now()}.json`, payload);
+    downloadJson(`review-export-${Date.now()}.json`, buildExportQueue());
   });
 
   els.btnExportData.addEventListener('click', async () => {
