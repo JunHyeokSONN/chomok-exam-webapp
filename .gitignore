@@ -1,8 +1,10 @@
-node_modules/
-.DS_Store
-.vscode/
-.logs/
-chomok-server.log
-*.log
 
+*.log
+.DS_Store
+.logs/
+.ocr-temp/
+.vscode/
+chomok-server.log
+images/
+node_modules/
 templates/ocr-extract.json
