@@ -10,12 +10,14 @@ const els = {
   btnRejectChecked: document.getElementById('btnRejectChecked'),
   btnExportQueue: document.getElementById('btnExportQueue'),
   btnExportData: document.getElementById('btnExportData'),
+  btnPreviewMerge: document.getElementById('btnPreviewMerge'),
   btnPrevItem: document.getElementById('btnPrevItem'),
   btnNextItem: document.getElementById('btnNextItem'),
   btnSelectAllVisible: document.getElementById('btnSelectAllVisible'),
   btnClearSelection: document.getElementById('btnClearSelection'),
   summary: document.getElementById('summary'),
   reviewList: document.getElementById('reviewList'),
+  mergePreview: document.getElementById('mergePreview'),
   modal: document.getElementById('imgModal'),
   modalImg: document.getElementById('modalImg'),
   modalClose: document.getElementById('modalClose')
@@ -663,7 +665,7 @@ function ensureQuestionHasId(q, idx) {
   q.id = `R${String(idx + 1).padStart(3, '0')}`;
 }
 
-function mergeApprovedData(data, queueItems) {
+function mergeApprovedDataWithStats(data, queueItems) {
   const merged = Array.isArray(data?.questions)
     ? [...data.questions]
     : Array.isArray(data)
@@ -672,18 +674,24 @@ function mergeApprovedData(data, queueItems) {
   const used = new Set(merged.map((q) => String(q.id || '')));
 
   let idx = 0;
+  const duplicateFixes = [];
+
   queueItems.forEach((item) => {
     if ((item.status || 'pending') !== 'approved') return;
     const q = { ...(item.question || {}) };
 
     if (!q.id) q.id = `R${String(++idx).padStart(3, '0')}`;
-    if (used.has(q.id)) {
+    let nextId = q.id;
+    if (used.has(nextId)) {
       let n = 2;
-      const base = q.id;
+      const base = nextId;
       while (used.has(`${base}_${n}`)) n += 1;
-      q.id = `${base}_${n}`;
+      const fixed = `${base}_${n}`;
+      duplicateFixes.push({ sourceId: nextId, fixedId: fixed });
+      nextId = fixed;
     }
 
+    q.id = nextId;
     ensureQuestionHasId(q, merged.length + idx);
     used.add(q.id);
 
@@ -695,8 +703,22 @@ function mergeApprovedData(data, queueItems) {
     merged.push(q);
   });
 
-  return { questions: merged };
+  const approved = queueItems.filter((item) => (item.status || 'pending') === 'approved');
+  return {
+    merged: { questions: merged },
+    stats: {
+      approved: approved.length,
+      mergedCount: merged.length,
+      duplicatesFixed: duplicateFixes.length,
+      duplicateFixes
+    }
+  };
 }
+
+function mergeApprovedData(data, queueItems) {
+  return mergeApprovedDataWithStats(data, queueItems).merged;
+}
+
 
 async function readJsonFromFile(file) {
   const text = await file.text();
@@ -713,6 +735,7 @@ async function loadQueueFromPath(path) {
   selectedQueueIdxs.clear();
   activeQueueIdx = -1;
   lastCheckedQueueIdx = null;
+  if (els.mergePreview) els.mergePreview.textContent = '병합 미리보기 없음';
   renderSummary();
   renderQueue();
 }
@@ -804,17 +827,44 @@ function bindEvents() {
     downloadJson(`review-export-${Date.now()}.json`, buildExportQueue());
   });
 
+  els.btnPreviewMerge.addEventListener('click', renderMergePreview);
+
+  async function loadBaseData() {
+    if (baseData) return;
+    try {
+      const res = await fetch('data.json');
+      baseData = await res.json();
+    } catch {
+      baseData = { questions: [] };
+    }
+  }
+
+  async function renderMergePreview() {
+    if (!queue) return;
+    await loadBaseData();
+
+    const approvedCount = queue.items.filter((item) => (item.status || 'pending') === 'approved').length;
+    if (!approvedCount) {
+      if (els.mergePreview) {
+        els.mergePreview.textContent = '승인 항목이 없습니다. 승인 처리 후 다시 시도해 주세요.';
+      }
+      return;
+    }
+
+    const { merged, stats } = mergeApprovedDataWithStats(baseData, queue.items);
+    const before = Array.isArray(baseData?.questions) ? baseData.questions.length : Array.isArray(baseData) ? baseData.length : 0;
+    const tail = merged.questions.slice(before).map((q) => q.id).slice(0, 6).join(', ') || '-';
+    const dup = stats.duplicateFixes.length ? stats.duplicateFixes.map((x) => `${x.sourceId}->${x.fixedId}`).join(', ') : '없음';
+
+    if (els.mergePreview) {
+      els.mergePreview.textContent = `병합 미리보기\n- 승인 건수: ${stats.approved}\n- 기존 data: ${before}건\n- 병합 후: ${stats.mergedCount}건\n- 중복 보정: ${stats.duplicatesFixed}건\n- 보정 예시: ${dup}\n- 병합될 샘플 ID: ${tail}`;
+    }
+  }
+
   els.btnExportData.addEventListener('click', async () => {
     if (!queue) return alert('큐가 없습니다.');
 
-    if (!baseData) {
-      try {
-        const res = await fetch('data.json');
-        baseData = await res.json();
-      } catch {
-        baseData = { questions: [] };
-      }
-    }
+    await loadBaseData();
 
     const approved = queue.items.filter((item) => (item.status || 'pending') === 'approved');
     if (!approved.length && !confirm('승인 건이 없습니다. 계속 진행할까요?')) return;

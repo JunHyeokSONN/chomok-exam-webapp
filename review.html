@@ -46,6 +46,8 @@
 
       .shortcutHint { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; line-height: 1.4; }
 
+      #mergePreview { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.45; }
+
       .imgModal {
         position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none;
         align-items: center; justify-content: center; z-index: 9999; padding: 1rem;
@@ -105,6 +107,7 @@
           <button id="btnRejectChecked">선택 항목 반려</button>
           <button id="btnExportQueue">검수 큐 저장</button>
           <button id="btnExportData">data.json 병합 저장</button>
+          <button id="btnPreviewMerge">병합 미리보기</button>
           <button id="btnPrevItem">이전 항목</button>
           <button id="btnNextItem">다음 항목</button>
         </div>
@@ -118,6 +121,9 @@
 
       <main>
         <div id="reviewList" class="reviewList"></div>
+        <section class="importWrap" style="margin-top: 0.8rem;">
+          <div id="mergePreview" class="summary" aria-live="polite">병합 미리보기 없음</div>
+        </section>
       </main>
 
       <section class="importWrap">
