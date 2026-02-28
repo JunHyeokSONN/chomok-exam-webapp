@@ -722,6 +722,50 @@ function renderSession() {
   else renderAll();
 }
 
+function startSubsetSession(items, options = {}) {
+  const opts = {
+    mode: 'learn',
+    timerMinutes: null,
+    label: '',
+    autoNext: false,
+    ...options
+  };
+
+  sessionQuestions = Array.isArray(items) ? items : [];
+  currentIndex = 0;
+  inTest = !!opts.inTest;
+  answerMeta = new Map();
+  gradedMeta = new Map();
+  wrongIds = new Set();
+
+  if (opts.mode) els.modeSelect.value = opts.mode;
+  if (typeof opts.autoNext === 'boolean') els.autoNext.checked = opts.autoNext;
+  if (typeof opts.viewMode === 'string') {
+    els.viewMode.value = opts.viewMode;
+  }
+
+  stopTimer();
+  renderSession();
+  updateStatusAndStats();
+  renderStats();
+  els.resultBox.hidden = false;
+  els.wrongMarkdown.hidden = true;
+  if (opts.timerMinutes && Number(opts.timerMinutes) > 0) {
+    startTimer(opts.timerMinutes);
+    inTest = true;
+  }
+
+  syncPresetState();
+  if (els.omrPanel && isOmrMode()) {
+    renderOmrSheet();
+    updateMarkButtonLabel();
+  }
+
+  if (opts.label) {
+    setStatus(`${opts.label} (${sessionQuestions.length}건)`);
+  }
+}
+
 function applyFiltersAndRender() {
   sessionQuestions = filterQuestions();
   if (els.modeSelect.value === 'test') {
@@ -1061,12 +1105,14 @@ els.btnOmrRetryMarked.addEventListener('click', () => {
     return;
   }
 
-  sessionQuestions = marked.map((idx) => sessionQuestions[idx]);
-  currentIndex = 0;
-  inTest = false;
-  renderSession();
-  updateStatusAndStats();
-  renderStats();
+  const subset = marked.map((idx) => sessionQuestions[idx]).filter(Boolean);
+  startSubsetSession(subset, {
+    mode: 'learn',
+    inTest: false,
+    autoNext: true,
+    viewMode: 'omr',
+    label: '복습표시만 재풀이'
+  });
 });
 els.btnRetryWrong.addEventListener('click', () => {
   if (!wrongIds.size) {
@@ -1074,17 +1120,22 @@ els.btnRetryWrong.addEventListener('click', () => {
     return;
   }
 
-  const wrong = sessionQuestions.filter((q, idx) => wrongIds.has(qKeyFor(idx, q)));
+  const wrong = sessionQuestions
+    .filter((q, idx) => wrongIds.has(qKeyFor(idx, q)))
+    .filter(Boolean);
+
   if (!wrong.length) {
     alert('오답 문제를 찾지 못했습니다.');
     return;
   }
-  sessionQuestions = wrong;
-  currentIndex = 0;
-  inTest = false;
-  renderSession();
-  updateStatusAndStats();
-  renderStats();
+
+  startSubsetSession(wrong, {
+    mode: 'learn',
+    inTest: false,
+    autoNext: true,
+    viewMode: isOmrMode() ? 'omr' : els.viewMode.value,
+    label: '오답문항만 재풀이'
+  });
 });
 
 els.btnCopyMarkdown.addEventListener('click', async () => {
