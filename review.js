@@ -64,6 +64,104 @@ function toOptionText(raw) {
   return Array.isArray(raw) ? raw.join('\n') : normText(raw);
 }
 
+
+function normalizeOptionToken(raw) {
+  return normText(String(raw || ''))
+    .replace(/[ 	]+/g, ' ')
+    .replace(/[⁄]/g, '/')
+    .replace(/^[\(\[]?\s*[0-9]{0,1}[\)\]\.]?\s*/, '')
+    .replace(/^[-•※]\s*/, '')
+    .trim();
+}
+
+function detectAnswerCandidate({ questionText = '', options = [], explanation = '', ocrRaw = '' }) {
+  const opts = parseOptionLines(options);
+  const lines = `${questionText}
+${explanation}
+${ocrRaw}`;
+
+  const toIndexed = (optText) => {
+    const s = normalizeOptionToken(optText);
+    const n = extractPrefixIndex(optText);
+    return { s, index: n ? (n - 1) : -1, raw: optText };
+  };
+
+  const indexedOptions = opts.map(toIndexed);
+
+  const candidates = [];
+  const explicit = lines.match(/(?:^|[\n\r])\s*(?:정답|답|answer|ans)\s*[:：]?\s*([①②③④0-9a-dA-D가-하])[\).\s\-:]*/i);
+  if (explicit?.[1]) {
+    const hit = mapSymbolToOption(explicit[1], indexedOptions);
+    if (hit) candidates.push(hit);
+  }
+
+  for (const t of lines.split(/\r?\n/)) {
+    const hitIdx = extractPrefixIndex(t);
+    if (hitIdx !== null) {
+      const idx = hitIdx - 1;
+      if (indexedOptions[idx]) candidates.push(indexedOptions[idx].raw);
+    }
+
+    const m = t.match(/답\s*\(?([1-4가-하②③④])\)?/);
+    if (m?.[1]) {
+      const hit = mapSymbolToOption(m[1], indexedOptions);
+      if (hit) candidates.push(hit);
+    }
+  }
+
+  return dedupe(candidates);
+}
+
+function mapSymbolToOption(token, indexedOptions) {
+  const s = String(token || '').trim();
+  if (!s) return null;
+  const idx = extractPrefixIndex(s);
+  if (idx != null) {
+    const target = indexedOptions[idx - 1];
+    if (target) return target.raw;
+  }
+  const symbolIndexMap = { '①': 1, '②': 2, '③': 3, '④': 4, '㈠': 1, '㈡': 2, '㈢': 3, '㈣': 4, '가': 1, '나': 2, '다': 3, '라': 4, 'A': 1, 'B': 2, 'C': 3, 'D': 4, 'a': 1, 'b': 2, 'c': 3, 'd': 4 };
+  const i = symbolIndexMap[s] || symbolIndexMap[s.toUpperCase()];
+  if (i != null && indexedOptions[i - 1]) return indexedOptions[i - 1].raw;
+
+  // exact option text match
+  const found = indexedOptions.find((it) => normalizeOptionToken(it.raw) === normalizeOptionToken(s));
+  return found?.raw || null;
+}
+
+function extractPrefixIndex(text) {
+  const s = String(text || '').trim();
+  const m = s.match(/^(?:\(?\s*([1-4])\)?|([①②③④])|([가-하])|([A-Da-d]))$/u);
+  if (m) {
+    if (m[1]) return Number(m[1]);
+    if (m[2]) return '①②③④'.indexOf(m[2]) + 1;
+    if (m[3]) return '가나다라마바사아자차카타파하'.indexOf(m[3]);
+    if (m[4]) return 'AaBbCcDd'.indexOf(m[4]) + 1;
+  }
+
+  const lead = s.match(/^(?:[\(\[\{]?\s*)([0-9]|[①②③④]|[가-하]|[A-Da-d])(?:[\)\]\.\s]+)/);
+  if (lead?.[1]) return mapSymbolToIdx(lead[1]);
+  return null;
+}
+
+function mapSymbolToIdx(token) {
+  const map = { '①': 1, '②': 2, '③': 3, '④': 4, '가': 1, '나': 2, '다': 3, '라': 4, 'A': 1, 'a': 1, 'B': 2, 'b': 2, 'C': 3, 'c': 3, 'D': 4, 'd': 4 };
+  if (/^[1-4]$/.test(token)) return Number(token);
+  return map[token] || null;
+}
+
+function dedupe(arr) {
+  const seen = new Set();
+  const out = [];
+  arr.forEach((v) => {
+    if (!v) return;
+    const k = String(v);
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(v);
+  });
+  return out;
+}
 function getQuestionId(q, index) {
   const id = normText(q.id || `Q_${index + 1}`);
   return id || `Q_${index + 1}`;
@@ -241,6 +339,34 @@ function createReviewCard(item, queueIdx, isActive) {
     field.appendChild(figure);
   }
 
+  const suggestBtn = document.createElement('button');
+  suggestBtn.type = 'button';
+  suggestBtn.textContent = '정답 후보 반영';
+  suggestBtn.addEventListener('click', () => {
+    const candidates = detectAnswerCandidate({
+      questionText: questionInput.value,
+      options: parseOptionLines(optsInput.value),
+      explanation: expInput.value,
+      ocrRaw: item?.ocr?.raw || item?._ocrMeta?.raw || ''
+    });
+
+    if (candidates[0]) {
+      answerInput.value = candidates[0];
+      return;
+    }
+
+    const text = [questionInput.value, expInput.value, item?.ocr?.raw, item?.explanation]
+      .filter(Boolean).join('\n');
+    const m = text.match(/(\d)/);
+    if (m?.[1]) {
+      const idx = Number(m[1]) - 1;
+      const parsed = parseOptionLines(optsInput.value);
+      if (parsed[idx]) {
+        answerInput.value = parsed[idx];
+      }
+    }
+  });
+
   const autoBtn = document.createElement('button');
   autoBtn.type = 'button';
   autoBtn.textContent = '자동 보정 적용';
@@ -301,6 +427,7 @@ function createReviewCard(item, queueIdx, isActive) {
     mk('보기 입력 (한 줄=1개)', optsInput),
     mk('정답', answerInput),
     mk('해설', expInput),
+    suggestBtn,
     autoBtn,
     saveBtn,
     metaBox
