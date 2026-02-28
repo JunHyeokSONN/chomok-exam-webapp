@@ -176,7 +176,9 @@ function isOmrMode() {
 
 function answerVisibleByDefault() {
   if (!els.showAnswerToggle) return false;
-  return isQaMode() || !!els.showAnswerToggle.checked;
+  if (isOmrMode()) return false;
+  if (isQaMode()) return true;
+  return !!els.showAnswerToggle.checked;
 }
 
 function toCardClass() {
@@ -901,12 +903,15 @@ els.btnReset.addEventListener('click', () => {
 
 els.btnStartTest.addEventListener('click', () => {
   if (!sessionQuestions.length) return;
-  inTest = true;
   if (els.modeSelect.value !== 'test') {
     const msg = '시험 모드는 시험 모드가 선택되어 있어야 합니다. 모드를 시험 모드로 변경할게요.';
     alert(msg);
     els.modeSelect.value = 'test';
   }
+  if (els.viewMode.value === 'omr' && els.showAnswerToggle) {
+    els.showAnswerToggle.checked = false;
+  }
+  inTest = true;
   applyFiltersAndRender();
   inTest = true;
   startTimer(els.timeLimitMin.value || 20);
@@ -917,6 +922,9 @@ els.btnPrev.addEventListener('click', goPrev);
 els.btnNext.addEventListener('click', goNext);
 els.modeSelect.addEventListener('change', () => {
   if (els.modeSelect.value === 'test') syncPresetState();
+  if (els.modeSelect.value === 'test' && els.viewMode.value === 'omr') {
+    if (els.showAnswerToggle) els.showAnswerToggle.checked = false;
+  }
   applyFiltersAndRender();
 });
 els.examCategory.addEventListener('change', () => {
@@ -929,6 +937,9 @@ els.difficultySelect.addEventListener('change', () => {
 });
 els.viewMode.addEventListener('change', () => {
   markPresetCustom();
+  if (els.viewMode.value === 'omr' && els.showAnswerToggle && els.showAnswerToggle.checked) {
+    els.showAnswerToggle.checked = false;
+  }
   renderSession();
 });
 els.maxCount.addEventListener('change', markPresetCustom);
