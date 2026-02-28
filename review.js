@@ -24,6 +24,7 @@ const els = {
 let queue = null;
 let baseData = null;
 let activeQueueIdx = -1;
+let lastCheckedQueueIdx = null;
 const selectedQueueIdxs = new Set();
 
 function normText(v) {
@@ -135,7 +136,7 @@ function extractPrefixIndex(text) {
   if (m) {
     if (m[1]) return Number(m[1]);
     if (m[2]) return '①②③④'.indexOf(m[2]) + 1;
-    if (m[3]) return '가나다라마바사아자차카타파하'.indexOf(m[3]);
+    if (m[3]) return '가나다라마바사아자차카타파하'.indexOf(m[3]) + 1;
     if (m[4]) return 'AaBbCcDd'.indexOf(m[4]) + 1;
   }
 
@@ -203,6 +204,25 @@ function getVisibleQueueItems() {
     .filter(({ item }) => mode === 'all' || (item.status || 'pending') === mode);
 }
 
+function setSelectionRange(targetIdx, anchorIdx, checked) {
+  const visible = getVisibleQueueItems().map((x) => x.index);
+  const start = visible.indexOf(anchorIdx);
+  const end = visible.indexOf(targetIdx);
+  if (start === -1 || end === -1) {
+    if (checked) selectedQueueIdxs.add(targetIdx);
+    else selectedQueueIdxs.delete(targetIdx);
+    return;
+  }
+
+  const a = Math.min(start, end);
+  const b = Math.max(start, end);
+  for (let i = a; i <= b; i += 1) {
+    const idx = visible[i];
+    if (checked) selectedQueueIdxs.add(idx);
+    else selectedQueueIdxs.delete(idx);
+  }
+}
+
 function renderSummary() {
   if (!queue) {
     els.summary.textContent = '배치 정보가 없습니다.';
@@ -226,6 +246,7 @@ function renderCheckboxState(card, queueIdx) {
   const cb = card.querySelector('.reviewSelect');
   if (!cb) return;
   cb.checked = selectedQueueIdxs.has(queueIdx);
+  card.dataset.selected = cb.checked ? 'true' : 'false';
 }
 
 function createReviewCard(item, queueIdx, isActive) {
@@ -248,8 +269,16 @@ function createReviewCard(item, queueIdx, isActive) {
   sel.checked = selectedQueueIdxs.has(queueIdx);
   sel.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (sel.checked) selectedQueueIdxs.add(queueIdx);
-    else selectedQueueIdxs.delete(queueIdx);
+
+    const checked = sel.checked;
+    if (e.shiftKey && lastCheckedQueueIdx !== null) {
+      setSelectionRange(queueIdx, lastCheckedQueueIdx, checked);
+    } else {
+      if (checked) selectedQueueIdxs.add(queueIdx);
+      else selectedQueueIdxs.delete(queueIdx);
+    }
+
+    lastCheckedQueueIdx = queueIdx;
     renderSummary();
   });
   selWrap.textContent = '선택';
@@ -357,7 +386,7 @@ function createReviewCard(item, queueIdx, isActive) {
 
     const text = [questionInput.value, expInput.value, item?.ocr?.raw, item?.explanation]
       .filter(Boolean).join('\n');
-    const m = text.match(/(\d)/);
+    const m = text.match(/(?:^|[^0-9])([1-4])(?:[^0-9]|$)/);
     if (m?.[1]) {
       const idx = Number(m[1]) - 1;
       const parsed = parseOptionLines(optsInput.value);
@@ -683,6 +712,7 @@ async function loadQueueFromPath(path) {
   queue.items = queue.items.map((item) => ({ status: item.status || 'pending', ...item }));
   selectedQueueIdxs.clear();
   activeQueueIdx = -1;
+  lastCheckedQueueIdx = null;
   renderSummary();
   renderQueue();
 }
@@ -705,6 +735,7 @@ function bindEvents() {
       queue = normalizeQueue(data);
       queue.items = queue.items.map((item) => ({ status: 'pending', ...item }));
       selectedQueueIdxs.clear();
+      lastCheckedQueueIdx = null;
       activeQueueIdx = -1;
       renderSummary();
       renderQueue();
@@ -737,6 +768,7 @@ function bindEvents() {
 
   els.statusFilter.addEventListener('change', () => {
     activeQueueIdx = -1;
+    lastCheckedQueueIdx = null;
     renderQueue();
   });
 

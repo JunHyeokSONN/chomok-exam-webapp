@@ -14,6 +14,7 @@
 
       .reviewCard { background: #171a23; border: 1px solid #2a2f3a; border-radius: 12px; padding: 1rem; }
       .reviewCard[data-active="true"] { border-color: #5b8cff; box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.25); }
+      .reviewCard[data-selected="true"] { border-left: 4px solid #5b8cff; background: linear-gradient(90deg, rgba(91, 140, 255, 0.08), transparent); }
 
       .reviewHeader { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-size: 0.93rem; color: var(--muted); }
 
@@ -112,7 +113,7 @@
           <button id="btnSelectAllVisible">현재 표시 모두 선택</button>
           <button id="btnClearSelection">선택 해제</button>
         </div>
-        <p class="shortcutHint">단축키: <strong>1</strong>=승인, <strong>0</strong>=반려, <strong>Enter</strong>=현재 항목 저장, <strong>[/]</strong>=이전/다음, <strong>N</strong>=저장+다음</p>
+        <p class="shortcutHint">단축키: <strong>1</strong>=승인, <strong>0</strong>=반려, <strong>Enter</strong>=현재 항목 저장, <strong>[/]</strong>=이전/다음, <strong>N</strong>=저장+다음. 체크박스는 <strong>Shift+클릭</strong>으로 현재 필터 영역 범위 일괄 선택.</p>
       </nav>
 
       <main>
