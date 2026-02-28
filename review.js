@@ -8,12 +8,18 @@ const els = {
   btnRejectAll: document.getElementById('btnRejectAll'),
   btnExportQueue: document.getElementById('btnExportQueue'),
   btnExportData: document.getElementById('btnExportData'),
+  btnPrevItem: document.getElementById('btnPrevItem'),
+  btnNextItem: document.getElementById('btnNextItem'),
   summary: document.getElementById('summary'),
-  reviewList: document.getElementById('reviewList')
+  reviewList: document.getElementById('reviewList'),
+  modal: document.getElementById('imgModal'),
+  modalImg: document.getElementById('modalImg'),
+  modalClose: document.getElementById('modalClose')
 };
 
 let queue = null;
 let baseData = null;
+let activeQueueIdx = -1;
 
 function normalizeQueue(json) {
   const payload = json || {};
@@ -27,8 +33,9 @@ function normalizeQueue(json) {
           question
         }))
       : [];
+
   return {
-    batchId: payload.batchId || 'UNKNOWN',
+    batchId: payload.batchId || `BATCH_${new Date().toISOString().replace(/[T:.]/g, '-').slice(0, 19)}`,
     generatedAt: payload.generatedAt || new Date().toISOString(),
     total: typeof payload.total === 'number' ? payload.total : items.length,
     items
@@ -58,6 +65,35 @@ function getQuestionId(q, index) {
   return id || `Q_${index + 1}`;
 }
 
+function setActiveByVisibleIndex(idx) {
+  if (!queue) return;
+  const arr = getVisibleQueueItems();
+  if (arr.length === 0) {
+    activeQueueIdx = -1;
+    return;
+  }
+  const safe = Math.max(0, Math.min(idx, arr.length - 1));
+  activeQueueIdx = arr[safe].index;
+  renderQueue();
+  const target = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+  target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function getVisibleQueueItems() {
+  if (!queue) return [];
+  const mode = els.statusFilter.value || 'all';
+  return queue.items
+    .map((item, idx) => ({ item, index: idx, ...item }))
+    .filter(({ status }) => mode === 'all' || (status || 'pending') === mode);
+}
+
+function getImageSrc(media) {
+  if (!media) return '';
+  if (typeof media === 'string') return media;
+  if (typeof media === 'object' && media.src) return media.src;
+  return '';
+}
+
 function renderSummary() {
   if (!queue) {
     els.summary.textContent = '배치 정보가 없습니다.';
@@ -81,37 +117,75 @@ function renderSummary() {
   `;
 }
 
-function createReviewCard(item, idx) {
+function applyCardToQueue(queueIdx, refs) {
+  const item = queue.items[queueIdx];
+  if (!item) return;
+
+  const {
+    statusSel,
+    idInput,
+    typeSel,
+    catInput,
+    diffSel,
+    questionInput,
+    optsInput,
+    answerInput,
+    expInput,
+    statusText,
+    state
+  } = refs;
+
+  item.status = statusSel.value;
+  const q = item.question || (item.question = {});
+  q.id = normText(idInput.value) || getQuestionId(q, queueIdx);
+  q.type = typeSel.value;
+  q.category = normText(catInput.value) || '토목기사';
+  q.difficulty = diffSel.value || 'normal';
+  q.question = questionInput.value || '';
+  q.options = parseOptionLines(optsInput.value);
+  q.answer = normText(answerInput.value);
+  q.explanation = normText(expInput.value) || '해설을 확인해 주세요.';
+  item.question = q;
+
+  statusText.textContent = item.status === 'approved' ? '승인' : item.status === 'rejected' ? '반려' : '대기';
+  state.dataset.status = item.status;
+
+  renderSummary();
+}
+
+function createReviewCard(item, queueIdx, isActive, visibleIndex) {
   const status = item.status || 'pending';
   const q = item.question || {};
 
   const card = document.createElement('section');
   card.className = 'reviewCard';
-  card.dataset.idx = idx;
+  card.dataset.idx = queueIdx;
+  card.dataset.visible = visibleIndex;
+  card.dataset.active = String(isActive);
 
   const header = document.createElement('div');
   header.className = 'reviewHeader';
 
   const left = document.createElement('div');
-  left.innerHTML = `<strong>Queue:</strong> ${normText(item.queueId)} / <strong>sourceId:</strong> ${normText(item.sourceId)} / <strong>원본:</strong> ${normText(item.sourceId)}`;
+  left.innerHTML = `<strong>Queue:</strong> ${normText(item.queueId)} / <strong>sourceId:</strong> ${normText(item.sourceId)} / <strong>원본:</strong> ${normText(item.sourcePath || q._sourceId)}`;
 
-  const state = document.createElement('span');
-  state.className = 'reviewStatus';
-  state.dataset.status = status;
-  state.textContent = status === 'approved' ? '승인' : status === 'rejected' ? '반려' : '대기';
+  const statusText = document.createElement('span');
+  statusText.className = 'reviewStatus';
+  statusText.dataset.status = status;
+  statusText.textContent = status === 'approved' ? '승인' : status === 'rejected' ? '반려' : '대기';
 
-  header.append(left, state);
+  header.append(left, statusText);
 
   const media = document.createElement('figure');
   media.className = 'miniFigure';
 
-  const mediaSrc = q.media || item.question?.media || '';
-  const hasMedia = Boolean(mediaSrc);
-  if (hasMedia) {
+  const mediaSrc = getImageSrc(q.media);
+  if (mediaSrc) {
     const img = document.createElement('img');
     img.loading = 'lazy';
-    img.src = typeof mediaSrc === 'string' ? mediaSrc : mediaSrc.src;
-    img.alt = normText(typeof mediaSrc === 'string' ? `${q.id || idx + 1} 이미지` : mediaSrc.alt);
+    img.src = mediaSrc;
+    img.alt = normText(q.id || item.sourceId || `문제 ${queueIdx + 1} 이미지`);
+    img.addEventListener('click', () => openModal(mediaSrc));
     media.appendChild(img);
     card.appendChild(media);
   }
@@ -119,12 +193,24 @@ function createReviewCard(item, idx) {
   const field = document.createElement('div');
   field.className = 'fieldGrid';
 
-  const makeLabelInput = (label, element) => {
+  const mk = (label, el) => {
     const wrap = document.createElement('label');
     wrap.textContent = label;
-    wrap.appendChild(element);
+    wrap.appendChild(el);
     return wrap;
   };
+
+  const statusSel = document.createElement('select');
+  [['pending', '대기'], ['approved', '승인'], ['rejected', '반려']].forEach(([v, t]) => {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = t;
+    if ((item.status || 'pending') === v) o.selected = true;
+    statusSel.appendChild(o);
+  });
+
+  const idInput = document.createElement('input');
+  idInput.value = normText(q.id || getQuestionId(q, queueIdx));
 
   const typeSel = document.createElement('select');
   ['multiple', 'short', 'truefalse'].forEach((t) => {
@@ -162,16 +248,7 @@ function createReviewCard(item, idx) {
   expInput.rows = 3;
   expInput.value = normText(q.explanation || '해설을 확인해 주세요.');
 
-  const statusSel = document.createElement('select');
-  ['pending', 'approved', 'rejected'].forEach((s) => {
-    const o = document.createElement('option');
-    o.value = s;
-    o.textContent = s === 'approved' ? '승인' : s === 'rejected' ? '반려' : '대기';
-    if (status === s) o.selected = true;
-    statusSel.appendChild(o);
-  });
-
-  const meta = item.ocr || {};
+  const meta = item.ocr || item._ocrMeta || {};
   const metaBox = document.createElement('details');
   const metaSummary = document.createElement('summary');
   metaSummary.textContent = 'OCR 메타/원문 보기';
@@ -193,55 +270,28 @@ function createReviewCard(item, idx) {
 
   const saveBtn = document.createElement('button');
   saveBtn.textContent = '현재 항목 적용';
+  saveBtn.type = 'button';
 
+  const refs = { statusSel, statusText, idInput, typeSel, catInput, diffSel, questionInput, optsInput, answerInput, expInput, state: statusText };
   saveBtn.addEventListener('click', () => {
-    item.status = statusSel.value;
-    q.type = typeSel.value;
-    q.category = catInput.value || '토목기사';
-    q.difficulty = diffSel.value || 'normal';
-    q.question = questionInput.value || ''; 
-    q.options = parseOptionLines(optsInput.value);
-    q.answer = answerInput.value || '';
-    q.explanation = expInput.value || '해설을 확인해 주세요.';
-
-    item.question = q;
-    state.dataset.status = item.status;
-    state.textContent = item.status === 'approved' ? '승인' : item.status === 'rejected' ? '반려' : '대기';
-    if (!item.reviewComment) item.reviewComment = '';
-
-    renderSummary();
-    renderQueue(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    applyCardToQueue(queueIdx, refs);
   });
 
-  const applyDefault = () => {
-    q.id = q.id || getQuestionId(q, idx);
-    if (q.id && !q.id.includes('AUTO')) {
-      return;
-    }
-    if (!q.id) {
-      q.id = getQuestionId(q, idx);
-    }
-  };
-
-  applyDefault();
-
-  const idInput = document.createElement('input');
-  idInput.value = q.id || '';
-  idInput.addEventListener('input', () => {
-    q.id = idInput.value;
+  card.addEventListener('click', () => {
+    activeQueueIdx = queueIdx;
+    renderQueue();
   });
 
   field.append(
-    makeLabelInput('상태', statusSel),
-    makeLabelInput('문항 ID', idInput),
-    makeLabelInput('문항 유형', typeSel),
-    makeLabelInput('출제분류', catInput),
-    makeLabelInput('난이도', diffSel),
-    makeLabelInput('문항 텍스트', questionInput),
-    makeLabelInput('보기 입력 (한 줄=1개)', optsInput),
-    makeLabelInput('정답', answerInput),
-    makeLabelInput('해설', expInput),
+    mk('상태', statusSel),
+    mk('문항 ID', idInput),
+    mk('문항 유형', typeSel),
+    mk('출제분류', catInput),
+    mk('난이도', diffSel),
+    mk('문항 텍스트', questionInput),
+    mk('보기 입력 (한 줄=1개)', optsInput),
+    mk('정답', answerInput),
+    mk('해설', expInput),
     saveBtn,
     metaBox
   );
@@ -250,23 +300,28 @@ function createReviewCard(item, idx) {
   return card;
 }
 
-function renderQueue(doFilter = true) {
+function renderQueue() {
   if (!queue) return;
   els.reviewList.innerHTML = '';
 
-  const filter = doFilter ? (els.statusFilter.value || 'all') : 'all';
+  const visible = getVisibleQueueItems();
 
-  const filtered = queue.items.filter((item) => filter === 'all' || (item.status || 'pending') === filter);
-  if (!filtered.length) {
+  if (visible.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'reviewCard';
     empty.textContent = '표시할 항목이 없습니다.';
     els.reviewList.appendChild(empty);
+    renderSummary();
     return;
   }
 
-  filtered.forEach((item, idx) => {
-    const card = createReviewCard(item, idx);
+  if (activeQueueIdx < 0 || !queue.items[activeQueueIdx]) {
+    activeQueueIdx = visible[0].index;
+  }
+
+  visible.forEach(({ item, index }, visibleIndex) => {
+    const isActive = index === activeQueueIdx;
+    const card = createReviewCard(item, index, isActive, visibleIndex);
     els.reviewList.appendChild(card);
   });
 
@@ -308,29 +363,148 @@ function mergeApprovedData(data, queueItems) {
   queueItems.forEach((item) => {
     if ((item.status || 'pending') !== 'approved') return;
     const q = { ...(item.question || {}) };
-
-    if (!q.id) {
-      q.id = `R${String(++idx).padStart(3, '0')}`;
-    }
+    if (!q.id) q.id = `R${String(++idx).padStart(3, '0')}`;
     if (used.has(q.id)) {
       let n = 2;
       const base = q.id;
       while (used.has(`${base}_${n}`)) n += 1;
       q.id = `${base}_${n}`;
     }
-
     ensureQuestionHasId(q, merged.length + idx);
     used.add(q.id);
 
     if (!q.category) q.category = '토목기사';
     if (!q.difficulty) q.difficulty = 'normal';
     if (!q.type) q.type = 'multiple';
-    if (!Array.isArray(q.options)) q.options = Array.isArray(q.options) ? q.options : ['1', '2', '3', '4'];
+    if (!Array.isArray(q.options)) q.options = ['1', '2', '3', '4'];
 
     merged.push(q);
   });
 
   return { questions: merged };
+}
+
+function openModal(src) {
+  if (!src) return;
+  els.modalImg.src = src;
+  els.modal.classList.add('open');
+  els.modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal() {
+  els.modal.classList.remove('open');
+  els.modal.setAttribute('aria-hidden', 'true');
+  els.modalImg.removeAttribute('src');
+}
+
+function saveActiveAndMaybeMove(step) {
+  if (activeQueueIdx < 0 || !queue) return;
+  const item = queue.items[activeQueueIdx];
+  if (!item) return;
+
+  const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+  if (!card) return;
+
+  const all = card.querySelectorAll('select, input, textarea, button');
+  const controls = Array.from(all);
+  const refs = {
+    statusSel: controls.find((c) => c.tagName === 'SELECT' && c.previousSibling?.textContent === '상태') || card.querySelector('select'),
+    statusText: card.querySelector('.reviewStatus'),
+    idInput: Array.from(card.querySelectorAll('input')).find((el) => el.previousSibling?.textContent === '문항 ID') || card.querySelector('input'),
+    typeSel: card.querySelectorAll('select')[1] || card.querySelector('select'),
+    catInput: Array.from(card.querySelectorAll('input'))[1],
+    diffSel: card.querySelectorAll('select')[2],
+    questionInput: card.querySelector('textarea'),
+    optsInput: card.querySelectorAll('textarea')[1],
+    answerInput: Array.from(card.querySelectorAll('input')).find((el) => el !== card.querySelector('input') && !Number.isNaN(Number(el.value))) || card.querySelectorAll('input')[1],
+    expInput: card.querySelectorAll('textarea')[2]
+  };
+  applyCardToQueue(activeQueueIdx, {
+    statusSel: item.status ? refs.statusSel : (card.querySelectorAll('select')[0] || card.querySelector('select')),
+    statusText: refs.statusText,
+    idInput: refs.idInput,
+    typeSel: refs.typeSel,
+    catInput: refs.catInput,
+    diffSel: refs.diffSel,
+    questionInput: refs.questionInput,
+    optsInput: refs.optsInput,
+    answerInput: refs.answerInput,
+    expInput: refs.expInput
+  });
+
+  const visible = getVisibleQueueItems();
+  const activePosition = visible.findIndex((v) => v.index === activeQueueIdx);
+  if (activePosition === -1) return;
+  let nextPos = activePosition + step;
+  if (nextPos < 0) nextPos = 0;
+  if (nextPos > visible.length - 1) nextPos = visible.length - 1;
+  activeQueueIdx = visible[nextPos].index;
+  renderQueue();
+}
+
+function setStatusForActive(nextStatus) {
+  if (!queue || activeQueueIdx < 0) return;
+  const item = queue.items[activeQueueIdx];
+  if (!item) return;
+  item.status = nextStatus;
+
+  const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+  if (card) {
+    const statusSel = card.querySelector('select');
+    const statusText = card.querySelector('.reviewStatus');
+    if (statusSel) statusSel.value = nextStatus;
+    if (statusText) {
+      statusText.dataset.status = nextStatus;
+      statusText.textContent = nextStatus === 'approved' ? '승인' : nextStatus === 'rejected' ? '반려' : '대기';
+    }
+  }
+  renderSummary();
+}
+
+function bindKeyboardShortcuts(e) {
+  if (!queue || queue.items.length === 0) return;
+
+  const tag = e.target?.tagName?.toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag)) return;
+
+  if (e.key === ']' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    saveActiveAndMaybeMove(1);
+    return;
+  }
+  if (e.key === '[' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    saveActiveAndMaybeMove(-1);
+    return;
+  }
+
+  if (e.key === '1') {
+    e.preventDefault();
+    setStatusForActive('approved');
+    return;
+  }
+
+  if (e.key === '0') {
+    e.preventDefault();
+    setStatusForActive('rejected');
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+    const save = card?.querySelector('button');
+    save?.click();
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'n') {
+    e.preventDefault();
+    const card = document.querySelector(`.reviewCard[data-idx="${activeQueueIdx}"]`);
+    const save = card?.querySelector('button');
+    save?.click();
+    saveActiveAndMaybeMove(1);
+  }
 }
 
 async function readJsonFromFile(file) {
@@ -344,8 +518,9 @@ async function loadQueueFromPath(path) {
   const data = await res.json();
   queue = normalizeQueue(data);
   queue.items = queue.items.map((item) => ({ status: 'pending', ...item }));
+  activeQueueIdx = -1;
   renderSummary();
-  renderQueue(false);
+  renderQueue();
 }
 
 function bindEvents() {
@@ -356,8 +531,9 @@ function bindEvents() {
       const data = await readJsonFromFile(file);
       queue = normalizeQueue(data);
       queue.items = queue.items.map((item) => ({ status: 'pending', ...item }));
+      activeQueueIdx = -1;
       renderSummary();
-      renderQueue(false);
+      renderQueue();
       els.queueFile.value = '';
     } catch {
       alert('큐 파일 형식이 잘못되었습니다.');
@@ -385,14 +561,17 @@ function bindEvents() {
     }
   });
 
-  els.statusFilter.addEventListener('change', () => renderQueue(false));
+  els.statusFilter.addEventListener('change', () => {
+    activeQueueIdx = -1;
+    renderQueue();
+  });
 
   els.btnApproveAll.addEventListener('click', () => {
     if (!queue?.items?.length) return;
     queue.items.forEach((item) => {
       if (!item.status || item.status === 'pending') item.status = 'approved';
     });
-    renderQueue(false);
+    renderQueue();
   });
 
   els.btnRejectAll.addEventListener('click', () => {
@@ -400,7 +579,7 @@ function bindEvents() {
     queue.items.forEach((item) => {
       if (!item.status || item.status === 'pending') item.status = 'rejected';
     });
-    renderQueue(false);
+    renderQueue();
   });
 
   els.btnExportQueue.addEventListener('click', () => {
@@ -422,14 +601,22 @@ function bindEvents() {
     }
 
     const approved = queue.items.filter((item) => (item.status || 'pending') === 'approved');
-    if (!approved.length) {
-      if (!confirm('승인 건이 없습니다. 계속 진행할까요?')) return;
-    }
+    if (!approved.length && !confirm('승인 건이 없습니다. 계속 진행할까요?')) return;
 
     const merged = mergeApprovedData(baseData, queue.items);
     downloadJson(`data-merged-${Date.now()}.json`, merged);
     alert(`병합 파일 생성 완료: 승인 ${approved.length}건, 총 ${merged.questions.length}문항`);
   });
+
+  els.btnPrevItem.addEventListener('click', () => saveActiveAndMaybeMove(-1));
+  els.btnNextItem.addEventListener('click', () => saveActiveAndMaybeMove(1));
+
+  els.modalClose.addEventListener('click', closeModal);
+  els.modal.addEventListener('click', (e) => {
+    if (e.target === els.modal) closeModal();
+  });
+
+  window.addEventListener('keydown', bindKeyboardShortcuts);
 }
 
 (async () => {

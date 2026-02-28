@@ -6,133 +6,56 @@
     <title>문제 검수 웹앱 | 토목기사 기출문제</title>
     <link rel="stylesheet" href="styles.css" />
     <style>
-      .reviewWrap {
-        width: min(1200px, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
-        margin: 0 auto;
-      }
+      .reviewWrap { width: min(1200px, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right))); margin: 0 auto; }
 
-      .reviewToolbar {
-        display: grid;
-        gap: 0.5rem;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        background: #11131a;
-        border: 1px solid #2d3440;
-        border-radius: 12px;
-        padding: 0.8rem;
-        margin-bottom: 0.8rem;
-      }
+      .reviewToolbar { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); background: #11131a; border: 1px solid #2d3440; border-radius: 12px; padding: 0.8rem; margin-bottom: 0.8rem; }
 
-      .reviewList {
-        display: grid;
-        gap: 0.75rem;
-      }
+      .reviewList { display: grid; gap: 0.75rem; }
 
-      .reviewCard {
-        background: #171a23;
-        border: 1px solid #2a2f3a;
-        border-radius: 12px;
-        padding: 1rem;
-      }
+      .reviewCard { background: #171a23; border: 1px solid #2a2f3a; border-radius: 12px; padding: 1rem; }
+      .reviewCard[data-active="true"] { border-color: #5b8cff; box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.25); }
 
-      .reviewHeader {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        gap: 0.5rem;
-        font-size: 0.93rem;
-        color: var(--muted);
-      }
+      .reviewHeader { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-size: 0.93rem; color: var(--muted); }
 
       .reviewStatus {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--touch-target);
-        border-radius: 999px;
-        padding: 0.2rem 0.6rem;
-        border: 1px solid #2d3440;
-        font-weight: 700;
-        color: #d9e1ff;
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: var(--touch-target); border-radius: 999px; padding: 0.2rem 0.6rem;
+        border: 1px solid #2d3440; font-weight: 700; color: #d9e1ff;
       }
-
       .reviewStatus[data-status="approved"] { background: #1f3a28; color: #9bf5b8; border-color: #2c6b3c; }
       .reviewStatus[data-status="rejected"] { background: #3b1f24; color: #ff9396; border-color: #7a2c35; }
       .reviewStatus[data-status="pending"] { background: #2c3a45; color: #d6deff; border-color: #3c4d62; }
 
-      .fieldGrid {
-        display: grid;
-        gap: 0.45rem;
-        margin-top: 0.6rem;
-      }
+      .fieldGrid { display: grid; gap: 0.45rem; margin-top: 0.6rem; }
+      .fieldGrid label { color: var(--muted); font-size: 0.9rem; }
+      .fieldGrid textarea, .fieldGrid input, .fieldGrid select { width: 100%; }
 
-      .fieldGrid label {
-        color: var(--muted);
-        font-size: 0.9rem;
-      }
-
-      .fieldGrid textarea,
-      .fieldGrid input,
-      .fieldGrid select {
-        width: 100%;
-      }
-
-      .summary {
-        background: #141822;
-        border: 1px solid #2d3440;
-        border-radius: 12px;
-        padding: 0.8rem;
-        margin-bottom: 0.75rem;
-      }
-
+      .summary { background: #141822; border: 1px solid #2d3440; border-radius: 12px; padding: 0.8rem; margin-bottom: 0.75rem; }
       .summary strong { color: #fff; }
 
-      .actionsRow {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin: 0.75rem 0 1rem;
-      }
+      .actionsRow { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 1rem; }
+      .actionsRow button, .reviewToolbar input[type="file"], .reviewToolbar button, .reviewToolbar select { width: auto; min-width: 150px; }
 
-      .actionsRow button,
-      .reviewToolbar input[type="file"],
-      .reviewToolbar button,
-      .reviewToolbar select {
-        width: auto;
-        min-width: 150px;
-      }
+      .note { font-size: 0.88rem; color: var(--muted); margin-top: 0.4rem; }
+      details { margin-top: 0.5rem; }
+      details summary { cursor: pointer; color: #b9d0ff; }
 
-      .metaPreview {
-        margin-top: 0.5rem;
-        font-size: 0.9rem;
-        color: var(--muted);
-      }
+      .miniFigure { margin: 0.45rem 0; }
+      .miniFigure img { max-width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #2d3440; cursor: zoom-in; }
 
-      details {
-        margin-top: 0.5rem;
-      }
+      .shortcutHint { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; line-height: 1.4; }
 
-      details summary {
-        cursor: pointer;
-        color: #b9d0ff;
+      .imgModal {
+        position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none;
+        align-items: center; justify-content: center; z-index: 9999; padding: 1rem;
       }
-
-      .miniFigure {
-        margin: 0.45rem 0;
-      }
-
-      .miniFigure img {
-        max-width: 100%;
-        max-height: 220px;
-        border-radius: 8px;
-        border: 1px solid #2d3440;
-      }
+      .imgModal.open { display: flex; }
+      .imgModal img { max-width: 95vw; max-height: 90vh; border: 1px solid #2d3440; border-radius: 8px; }
+      .imgModal button { position: absolute; top: 12px; right: 12px; min-width: auto; }
 
       @media (max-width: 640px) {
         .reviewToolbar { grid-template-columns: 1fr 1fr; }
-        .actionsRow button,
-        .reviewToolbar input[type="file"],
-        .reviewToolbar button,
-        .reviewToolbar select { min-width: 140px; }
+        .actionsRow button, .reviewToolbar input[type="file"], .reviewToolbar button, .reviewToolbar select { min-width: 140px; }
       }
     </style>
   </head>
@@ -144,9 +67,7 @@
       </header>
 
       <nav class="importWrap">
-        <div class="summary" id="summary">
-          배치 정보가 없습니다.
-        </div>
+        <div class="summary" id="summary">배치 정보가 없습니다.</div>
 
         <div class="reviewToolbar">
           <div>
@@ -181,7 +102,11 @@
           <button id="btnRejectAll">대기중 전부 반려</button>
           <button id="btnExportQueue">검수 큐 저장</button>
           <button id="btnExportData">data.json 병합 저장</button>
+          <button id="btnPrevItem">이전 항목</button>
+          <button id="btnNextItem">다음 항목</button>
         </div>
+
+        <p class="shortcutHint">단축키: <strong>1</strong>=승인, <strong>0</strong>=반려, <strong>Enter</strong>=현재 항목 저장, <strong>[/]</strong>=이전/다음, <strong>N</strong>=저장+다음</p>
       </nav>
 
       <main>
@@ -191,6 +116,11 @@
       <section class="importWrap">
         <p style="margin:0 0 0.5rem">빠른 이동: <a href="./index.html">문제풀이 화면</a></p>
       </section>
+    </div>
+
+    <div id="imgModal" class="imgModal" aria-hidden="true">
+      <button id="modalClose">닫기</button>
+      <img id="modalImg" src="" alt="이미지 미리보기" />
     </div>
 
     <script src="review.js"></script>
