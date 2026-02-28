@@ -141,7 +141,15 @@ git push -u origin main
 npm run start             # 로컬 정적 서버 실행(8000)
 npm run validate          # 문법/데이터/템플릿 체크
 npm run export-categories # 분류별 JSON/CSV 템플릿 재생성
+npm run ocr -- <이미지경로> [--id T014] [--category 토목기사] [--difficulty hard]
+                          # 단발성 OCR 판독 -> templates/ocr-extract.json 또는 --out 출력
 ```
+
+### OCR 판독 가이드
+- `npm run ocr -- /path/to/photo.jpg --id T014` 실행
+- OCR 결과는 `templates/ocr-extract.json`에 저장
+- `media` 항목은 `images/`로 복사/연결되며, 해설/문항/보기가 후보 텍스트로 채워짐
+- OCR 엔진이 없으면 스텁(JSON)이 생성되므로 수동 보정 후 `data.json`에 반영
 
 ## 마무리 체크
 - `http://127.0.0.1:8000/index.html` 응답 확인

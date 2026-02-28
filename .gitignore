@@ -4,3 +4,5 @@ node_modules/
 .logs/
 chomok-server.log
 *.log
+
+templates/ocr-extract.json
