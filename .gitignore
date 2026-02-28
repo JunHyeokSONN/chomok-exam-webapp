@@ -7,4 +7,5 @@
 chomok-server.log
 images/
 node_modules/
+templates/ocr-extract-*.json
 templates/ocr-extract.json
