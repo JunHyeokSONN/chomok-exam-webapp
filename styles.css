@@ -512,3 +512,11 @@ button:hover,
     scroll-behavior: auto !important;
   }
 }
+
+
+/* OMR/결과 */
+.summaryLine {
+  margin: 0.4rem 0;
+  color: #9bb4ff;
+  font-weight: 600;
+}

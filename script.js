@@ -52,6 +52,7 @@ const els = {
   quizArea: document.getElementById('quizArea'),
   resultBox: document.getElementById('resultBox'),
   scoreText: document.getElementById('scoreText'),
+  resultSummary: document.getElementById('resultSummary'),
   statsByDiff: document.getElementById('statsByDiff'),
   wrongMarkdown: document.getElementById('wrongMarkdown'),
   btnRetryWrong: document.getElementById('btnRetryWrong'),
@@ -89,6 +90,7 @@ let wrongIds = new Set();
 let reviewMarks = new Set();
 let sessionStartAt = null;
 let scoreHistory = [];
+let currentSessionMeta = { kind: 'normal', label: '', totalTarget: 0, subsetType: null, subsetTarget: 0 };
 
 const STORAGE = {
   progress: 'chomok_progress',
@@ -105,6 +107,50 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+function isSubsetSession() {
+  return currentSessionMeta.kind === 'subset';
+}
+
+function setSubsetSessionMeta(meta = {}) {
+  currentSessionMeta = {
+    kind: 'normal',
+    label: '',
+    totalTarget: 0,
+    elapsedTargetSec: null,
+    inLearningMode: false,
+    subsetType: null,
+    subsetTarget: 0,
+    ...meta
+  };
+}
+
+function applySessionChrome() {
+  if (!els.btnFinishTest || !els.timerPanel) return;
+
+  const shouldDisableTimerFinish = isSubsetSession();
+  els.btnFinishTest.hidden = shouldDisableTimerFinish;
+
+  if (shouldDisableTimerFinish) {
+    stopTimer();
+    if (els.timerText) els.timerText.textContent = '--:--';
+    els.timerPanel.hidden = true;
+  }
+}
+
+function renderResultSummary({ right, total, wrong, percent }) {
+  if (!els.resultSummary) return;
+
+  if (!isSubsetSession()) {
+    els.resultSummary.textContent = '';
+    return;
+  }
+
+  const target = currentSessionMeta.totalTarget || total;
+  const targetRate = target ? Math.round((right / target) * 100) : percent;
+  const modeName = currentSessionMeta.subsetType === 'review' ? '복습표시 재풀이' : (currentSessionMeta.subsetType === 'wrong' ? '오답 재풀이' : '재풀이');
+  els.resultSummary.textContent = `${modeName}: 목표 ${target}건, 정답 ${right}개(${targetRate}%), 오답 ${wrong}개`;
+}
+
 function toHalfWidth(raw) {
   return String(raw).replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => {
     const n = ch.charCodeAt(0);
@@ -113,6 +159,11 @@ function toHalfWidth(raw) {
     if (n >= 0xff41 && n <= 0xff5a) return String.fromCharCode(n - 0xfee0);
     return ch;
   });
+}
+
+function toCurrentModeLabel() {
+  const selected = els.viewMode.options[els.viewMode.selectedIndex];
+  return selected ? selected.text : (els.viewMode.value || 'single');
 }
 
 function canonicalize(raw) {
@@ -521,6 +572,17 @@ function gradeOne(index, key, q, card, optionsWrap, shouldCheck) {
 
   if (isSingleMode() && inTest && els.autoNext.checked && index < sessionQuestions.length - 1) {
     setTimeout(() => goNext(), 250);
+    return;
+  }
+
+  if (isSubsetSession() && isSingleMode()) {
+    const isLast = index >= sessionQuestions.length - 1;
+    const shouldFinish = isLast && isSubsetSession();
+    if (shouldFinish) {
+      setTimeout(() => {
+        computeFinalResult();
+      }, 120);
+    }
   }
 }
 
@@ -728,12 +790,24 @@ function startSubsetSession(items, options = {}) {
     timerMinutes: null,
     label: '',
     autoNext: false,
+    subsetType: 'subset',
+    inLearningMode: true,
     ...options
   };
 
+  setSubsetSessionMeta({
+    kind: 'subset',
+    label: opts.label || '재풀이',
+    totalTarget: Array.isArray(items) ? items.length : 0,
+    elapsedTargetSec: null,
+    inLearningMode: true,
+    subsetType: opts.subsetType || 'subset',
+    subsetTarget: Array.isArray(items) ? items.length : 0
+  });
+
   sessionQuestions = Array.isArray(items) ? items : [];
   currentIndex = 0;
-  inTest = !!opts.inTest;
+  inTest = !!opts.inTest && opts.inLearningMode === false;
   answerMeta = new Map();
   gradedMeta = new Map();
   wrongIds = new Set();
@@ -743,14 +817,19 @@ function startSubsetSession(items, options = {}) {
   if (typeof opts.viewMode === 'string') {
     els.viewMode.value = opts.viewMode;
   }
+  if (opts.inLearningMode) {
+    els.modeSelect.value = 'learn';
+    inTest = false;
+  }
 
   stopTimer();
+  applySessionChrome();
   renderSession();
   updateStatusAndStats();
   renderStats();
-  els.resultBox.hidden = false;
+  els.resultBox.hidden = true;
   els.wrongMarkdown.hidden = true;
-  if (opts.timerMinutes && Number(opts.timerMinutes) > 0) {
+  if (opts.timerMinutes && Number(opts.timerMinutes) > 0 && !opts.inLearningMode) {
     startTimer(opts.timerMinutes);
     inTest = true;
   }
@@ -778,6 +857,7 @@ function applyFiltersAndRender() {
   currentIndex = 0;
   inTest = false;
 
+  setSubsetSessionMeta({ kind: 'normal', label: '', totalTarget: 0, subsetType: null, subsetTarget: 0, inLearningMode: false });
   stopTimer();
   renderSession();
   updateStatusAndStats();
@@ -785,12 +865,28 @@ function applyFiltersAndRender() {
   els.resultBox.hidden = false;
   els.wrongMarkdown.hidden = true;
   syncPresetState();
+  applySessionChrome();
 }
 
 function goNext() {
   if (!sessionQuestions.length) return;
+  if (isSubsetSession() && currentIndex >= sessionQuestions.length - 1) {
+    computeFinalResult();
+    return;
+  }
+
   currentIndex = Math.min(sessionQuestions.length - 1, currentIndex + 1);
   renderSingle();
+
+  if (isSubsetSession() && currentIndex >= sessionQuestions.length - 1) {
+    const hasAllAnswers = sessionQuestions.every((q, idx) => {
+      const k = qKeyFor(idx, q);
+      return normalize(answerMeta.get(k) || '');
+    });
+    if (hasAllAnswers) {
+      computeFinalResult();
+    }
+  }
 }
 
 function goPrev() {
@@ -838,27 +934,35 @@ function computeFinalResult({ auto = false } = {}) {
   const { right, total, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
   const elapsed = sessionStartAt ? Math.max(0, Math.floor((Date.now() - sessionStartAt) / 1000)) : 0;
-  const record = {
-    at: new Date().toISOString(),
-    total,
-    right,
-    wrong,
-    percent,
-    elapsedSec: elapsed,
-    category: els.examCategory.value,
-    difficulty: els.difficultySelect.value,
-    mode: els.modeSelect.value,
-    viewMode: els.viewMode.value,
-    title: getCurrentModeLabel(),
-    maxCount: toInt(els.maxCount.value, 0),
-    timeLimitMin: toInt(els.timeLimitMin.value, 20)
-  };
+
   if (auto) alert('시간 종료! 자동 채점합니다.');
-  saveScoreRecord(record);
+
+  const isSubset = isSubsetSession();
+  if (!isSubset && (els.modeSelect.value === 'test' || inTest)) {
+    const record = {
+      at: new Date().toISOString(),
+      total,
+      right,
+      wrong,
+      percent,
+      elapsedSec: elapsed,
+      category: els.examCategory.value,
+      difficulty: els.difficultySelect.value,
+      mode: els.modeSelect.value,
+      viewMode: els.viewMode.value,
+      title: getCurrentModeLabel(),
+      maxCount: toInt(els.maxCount.value, 0),
+      timeLimitMin: toInt(els.timeLimitMin.value, 20)
+    };
+    saveScoreRecord(record);
+  }
+
   els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
   renderStats();
+  renderResultSummary({ right, total, wrong, percent, elapsed });
   revealWrongPanel();
   els.resultBox.hidden = false;
+  applySessionChrome();
 }
 
 function syncPresetState() {
@@ -1110,6 +1214,8 @@ els.btnOmrRetryMarked.addEventListener('click', () => {
     mode: 'learn',
     inTest: false,
     autoNext: true,
+    inLearningMode: true,
+    subsetType: 'review',
     viewMode: 'omr',
     label: '복습표시만 재풀이'
   });
@@ -1133,6 +1239,8 @@ els.btnRetryWrong.addEventListener('click', () => {
     mode: 'learn',
     inTest: false,
     autoNext: true,
+    inLearningMode: true,
+    subsetType: 'wrong',
     viewMode: isOmrMode() ? 'omr' : els.viewMode.value,
     label: '오답문항만 재풀이'
   });
@@ -1206,6 +1314,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadScoreHistory();
   renderScoreHistory();
   loadReviewMarks();
+  setSubsetSessionMeta({ kind: 'normal', label: '', totalTarget: 0, subsetType: null, subsetTarget: 0, inLearningMode: false });
+  applySessionChrome();
 
   if (!allQuestions.length) await loadDefault();
   else {
