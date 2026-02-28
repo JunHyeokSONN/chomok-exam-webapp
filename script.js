@@ -140,7 +140,7 @@ function applySessionChrome() {
   }
 }
 
-function renderResultSummary({ right, total, wrong, percent }) {
+function renderResultSummary({ right, total, wrong, percent, completed }) {
   if (!els.resultSummary) return;
 
   if (!isSubsetSession()) {
@@ -149,9 +149,10 @@ function renderResultSummary({ right, total, wrong, percent }) {
   }
 
   const target = currentSessionMeta.totalTarget || total;
+  const done = completed != null ? completed : total;
   const targetRate = target ? Math.round((right / target) * 100) : percent;
   const modeName = currentSessionMeta.subsetType === 'review' ? '복습표시 재풀이' : (currentSessionMeta.subsetType === 'wrong' ? '오답 재풀이' : '재풀이');
-  els.resultSummary.textContent = `${modeName}: 목표 ${target}건, 정답 ${right}개(${targetRate}%), 오답 ${wrong}개`;
+  els.resultSummary.textContent = `${modeName}: 목표 ${target}건, 완료 ${done}건, 정답 ${right}개(${targetRate}%), 오답 ${wrong}개`;
 }
 
 function toHalfWidth(raw) {
@@ -937,6 +938,7 @@ function computeFinalResult({ auto = false } = {}) {
   const { right, total, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
   const elapsed = sessionStartAt ? Math.max(0, Math.floor((Date.now() - sessionStartAt) / 1000)) : 0;
+  const answered = countAnswered();
 
   if (auto) alert('시간 종료! 자동 채점합니다.');
 
@@ -952,7 +954,8 @@ function computeFinalResult({ auto = false } = {}) {
       subsetType: currentSessionMeta.subsetType || 'subset',
       mode: els.modeSelect.value,
       viewMode: els.viewMode.value,
-      target: currentSessionMeta.totalTarget || total
+      target: currentSessionMeta.totalTarget || total,
+      completed: answered
     });
   } else if (els.modeSelect.value === 'test' || inTest) {
     const record = {
@@ -975,7 +978,7 @@ function computeFinalResult({ auto = false } = {}) {
 
   els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
   renderStats();
-  renderResultSummary({ right, total, wrong, percent, elapsed });
+  renderResultSummary({ right, total, wrong, percent, elapsed, completed: answered });
   renderSubsetHistory();
   revealWrongPanel();
   els.resultBox.hidden = false;
@@ -1058,7 +1061,8 @@ function renderSubsetHistory() {
     const ss = String(elapsed % 60).padStart(2, '0');
     const d = r.at ? new Date(r.at).toLocaleString('ko-KR') : '-';
     const modeName = r.subsetType === 'review' ? '복습표시' : (r.subsetType === 'wrong' ? '오답' : '재풀이');
-    return `<div class="item">${d} · ${modeName} ${r.answered}/${r.total} (${r.percent}%) · 시간 ${mm}:${ss}</div>`;
+    const done = typeof r.completed === 'number' ? r.completed : r.total;
+    return `<div class="item">${d} · ${modeName} 완료 ${done}/${r.target ?? r.total} · 정답 ${r.answered}/${r.total} (${r.percent}%) · 시간 ${mm}:${ss}</div>`;
   }).join('');
 
   els.subsetHistory.innerHTML = rows;
