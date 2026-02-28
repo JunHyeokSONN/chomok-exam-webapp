@@ -235,6 +235,11 @@ header p {
   box-shadow: 0 0 0 2px #5b8cff55 inset;
 }
 
+.omrCell.review {
+  border-color: #d4af37;
+  background: #3b2f20;
+}
+
 @media (min-width: 981px) {
   .omrGrid {
     grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));

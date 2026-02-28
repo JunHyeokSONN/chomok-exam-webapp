@@ -67,6 +67,9 @@ const els = {
   singlePos: document.getElementById('singlePos'),
   omrPanel: document.getElementById('omrPanel'),
   omrGrid: document.getElementById('omrGrid'),
+  btnOmrNextWrong: document.getElementById('btnOmrNextWrong'),
+  btnOmrMarkCurrent: document.getElementById('btnOmrMarkCurrent'),
+  btnOmrClearMark: document.getElementById('btnOmrClearMark'),
   scoreHistoryWrap: document.getElementById('scoreHistoryWrap'),
   btnClearScore: document.getElementById('btnClearScore')
 };
@@ -81,6 +84,7 @@ let inTest = false;
 let answerMeta = new Map();
 let gradedMeta = new Map();
 let wrongIds = new Set();
+let reviewMarks = new Set();
 let sessionStartAt = null;
 let scoreHistory = [];
 
@@ -190,6 +194,52 @@ function getCurrentModeLabel() {
   const selected = els.viewMode.options[els.viewMode.selectedIndex];
   return selected ? selected.text : (els.viewMode.value || 'single');
 }
+
+function getReviewMarkCount() {
+  return reviewMarks.size;
+}
+
+function toggleReviewMark(idx, key) {
+  const k = key || qKeyFor(idx, sessionQuestions[idx]);
+  if (!k) return;
+  if (reviewMarks.has(k)) reviewMarks.delete(k);
+  else reviewMarks.add(k);
+  persistReviewMarks();
+  renderOmrSheet();
+  updateMarkButtonLabel();
+}
+
+function persistReviewMarks() {
+  localStorage.setItem('chomok_review_marks', JSON.stringify(Array.from(reviewMarks)));
+}
+
+function loadReviewMarks() {
+  try {
+    const raw = localStorage.getItem('chomok_review_marks');
+    reviewMarks = new Set(Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw) : []);
+  } catch {
+    reviewMarks = new Set();
+  }
+}
+
+function clearReviewMarks() {
+  reviewMarks = new Set();
+  localStorage.removeItem('chomok_review_marks');
+}
+
+function updateMarkButtonLabel() {
+  if (!els.btnOmrMarkCurrent) return;
+  if (!sessionQuestions.length) {
+    els.btnOmrMarkCurrent.textContent = '현재문항 복습표시';
+    return;
+  }
+  const q = sessionQuestions[currentIndex];
+  const k = qKeyFor(currentIndex, q);
+  els.btnOmrMarkCurrent.textContent = reviewMarks.has(k)
+    ? '현재문항 복습표시 해제'
+    : '현재문항 복습표시';
+}
+
 
 function fillPresetOptions() {
   for (const [key, v] of Object.entries(PRESETS)) {
@@ -627,6 +677,7 @@ function renderSingle() {
     els.singleNav.hidden = false;
     if (els.omrPanel) els.omrPanel.hidden = false;
     renderOmrSheet();
+    updateMarkButtonLabel();
   } else {
     els.singlePos.textContent = `${currentIndex + 1} / ${sessionQuestions.length}`;
     if (els.omrPanel) els.omrPanel.hidden = true;
@@ -652,6 +703,7 @@ function renderAll() {
   els.singleNav.hidden = true;
   updateStatusAndStats();
   renderStats();
+  updateMarkButtonLabel();
 }
 
 function renderSession() {
@@ -785,6 +837,10 @@ function renderOmrSheet() {
     if (isActive) btn.classList.add('current');
     if (isWrong) btn.classList.add('wrong');
     else if (hasAnswer) btn.classList.add('answered');
+    if (reviewMarks.has(key)) btn.classList.add('review');
+    if (reviewMarks.has(key)) {
+      btn.textContent = `${idx + 1} ★`;
+    }
 
     btn.addEventListener('click', () => {
       currentIndex = idx;
@@ -949,6 +1005,32 @@ els.showAnswerToggle.addEventListener('change', () => {
   renderSession();
   renderOmrSheet();
 });
+els.btnOmrNextWrong.addEventListener('click', () => {
+  if (!wrongIds.size) {
+    alert('현재 오답 표시는 없습니다.');
+    return;
+  }
+
+  const base = sessionQuestions.map((q, idx) => ({ q, idx }));
+  for (const { idx } of base) {
+    if (wrongIds.has(qKeyFor(idx, sessionQuestions[idx]))) {
+      currentIndex = idx;
+      renderSession();
+      return;
+    }
+  }
+  alert('오답 문제를 찾지 못했습니다.');
+});
+els.btnOmrMarkCurrent.addEventListener('click', () => {
+  const q = sessionQuestions[currentIndex];
+  if (!q) return;
+  toggleReviewMark(currentIndex, qKeyFor(currentIndex, q));
+});
+els.btnOmrClearMark.addEventListener('click', () => {
+  clearReviewMarks();
+  renderOmrSheet();
+  updateMarkButtonLabel();
+});
 els.btnRetryWrong.addEventListener('click', () => {
   if (!wrongIds.size) {
     alert('오답 문제가 없습니다.');
@@ -1035,6 +1117,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   loadPreset();
   loadScoreHistory();
   renderScoreHistory();
+  loadReviewMarks();
 
   if (!allQuestions.length) await loadDefault();
   else {
