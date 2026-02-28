@@ -147,6 +147,101 @@ header p {
   padding: 1rem;
 }
 
+
+.questionText {
+  margin-bottom: 0.5rem;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.singleLargeCard {
+  font-size: 1.05rem;
+  padding: 1.1rem;
+}
+
+.singleLargeCard .questionText {
+  font-size: 1.06rem;
+}
+
+.singleLargeCard .question-media img {
+  width: min(100%, 980px);
+  max-height: 560px;
+}
+
+.answerBlock {
+  margin-top: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid #273146;
+  border-radius: 8px;
+  background: #111622;
+}
+
+.answerBlock .short-answer {
+  margin: 0 0 0.45rem;
+}
+
+.scoreItem {
+  border: 1px solid #273042;
+  border-radius: 8px;
+  padding: 0.62rem;
+  margin: 0.4rem 0;
+  background: #10151e;
+}
+
+.scoreItem strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0.4rem 0;
+}
+
+.omrPanel {
+  background: #111722;
+  border: 1px solid #2d3440;
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.omrGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 0.45rem;
+}
+
+.omrCell {
+  min-height: var(--touch-target);
+  border-radius: 8px;
+  background: #1e2634;
+  border: 1px solid #2f3a4e;
+  padding: 0 !important;
+}
+
+.omrCell.answered {
+  border-color: #3fb950;
+  background: #18331d;
+}
+
+.omrCell.wrong {
+  border-color: #ff4d4f;
+  background: #3b1f24;
+}
+
+.omrCell.current {
+  border-color: #8fb4ff;
+  box-shadow: 0 0 0 2px #5b8cff55 inset;
+}
+
+@media (min-width: 981px) {
+  .omrGrid {
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+    max-width: 820px;
+  }
+}
+
 .question-media {
   margin: 0.6rem 0 0;
 }
@@ -333,6 +428,30 @@ ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
   .result,
   .importWrap {
     padding: 0.8rem;
+  }
+
+
+  .omrPanel {
+    padding: 0.65rem;
+  }
+
+  .omrGrid {
+    grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+    gap: 0.35rem;
+  }
+
+  .omrCell {
+    min-height: 40px;
+  }
+
+  .singleLargeCard,
+  .singleLargeCard .questionText {
+    font-size: 1rem;
+  }
+
+  .omrPanel h3 {
+    margin: 0 0 0.45rem;
+    font-size: 0.98rem;
   }
 
   .actions {

@@ -10,7 +10,7 @@
     <div class="wrap">
       <header>
         <h1>토목기사 기출문제</h1>
-        <p>문제 풀이 + 채점 + 오답 복기 + 타이머</p>
+        <p>문제 풀이 + 채점 + 성적관리 + OMR/단일학습 모드 지원</p>
         <p><a href="./review.html">문제 검수 웹앱 바로가기</a></p>
       </header>
 
@@ -48,8 +48,11 @@
         <label>
           보기 방식:
           <select id="viewMode">
-            <option value="all">전체 보기</option>
             <option value="single">한문항씩</option>
+            <option value="single-large">한문항씩 큰 화면</option>
+            <option value="omr">OMR(시험장형)</option>
+            <option value="qa">문제+답/해설 동시 보기</option>
+            <option value="all">전체 보기</option>
           </select>
         </label>
         <label>
@@ -63,6 +66,10 @@
         <button id="btnStartTest">시험 시작</button>
         <button id="btnShuffle">랜덤 섞기</button>
         <button id="btnReset">초기화</button>
+        <label class="inline-check">
+          <input id="showAnswerToggle" type="checkbox" checked />
+          정답/해설 보이기
+        </label>
         <label class="inline-check">
           <input id="autoNext" type="checkbox" checked />
           채점 후 자동 다음
@@ -81,6 +88,10 @@
         <span id="singlePos">-</span>
         <button id="btnNext">다음</button>
       </nav>
+      <section id="omrPanel" class="omrPanel" hidden>
+        <h3>OMR 답안지</h3>
+        <div id="omrGrid" class="omrGrid" aria-live="polite"></div>
+      </section>
 
       <main id="quizArea">로딩 중...</main>
 
@@ -93,6 +104,14 @@
           <button id="btnCopyMarkdown">오답 내역 마크다운 복사</button>
         </div>
         <pre id="wrongMarkdown" hidden></pre>
+      </section>
+
+      <section class="result" id="scoreHistoryBox">
+        <h2>성적관리</h2>
+        <div class="actions">
+          <button id="btnClearScore">성적 초기화</button>
+        </div>
+        <div id="scoreHistoryWrap"></div>
       </section>
 
       <section class="importWrap">

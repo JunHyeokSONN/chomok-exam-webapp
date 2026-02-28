@@ -41,6 +41,7 @@ const els = {
   maxCount: document.getElementById('maxCount'),
   timeLimitMin: document.getElementById('timeLimitMin'),
   autoNext: document.getElementById('autoNext'),
+  showAnswerToggle: document.getElementById('showAnswerToggle'),
   btnStartTest: document.getElementById('btnStartTest'),
   btnShuffle: document.getElementById('btnShuffle'),
   btnReset: document.getElementById('btnReset'),
@@ -63,7 +64,11 @@ const els = {
   singleNav: document.getElementById('singleNav'),
   btnPrev: document.getElementById('btnPrev'),
   btnNext: document.getElementById('btnNext'),
-  singlePos: document.getElementById('singlePos')
+  singlePos: document.getElementById('singlePos'),
+  omrPanel: document.getElementById('omrPanel'),
+  omrGrid: document.getElementById('omrGrid'),
+  scoreHistoryWrap: document.getElementById('scoreHistoryWrap'),
+  btnClearScore: document.getElementById('btnClearScore')
 };
 
 let allQuestions = [];
@@ -76,11 +81,14 @@ let inTest = false;
 let answerMeta = new Map();
 let gradedMeta = new Map();
 let wrongIds = new Set();
+let sessionStartAt = null;
+let scoreHistory = [];
 
 const STORAGE = {
   progress: 'chomok_progress',
   backup: 'chomok_questions_backup',
-  preset: 'chomok_preset'
+  preset: 'chomok_preset',
+  scoreHistory: 'chomok_score_history'
 };
 
 function qKeyFor(idx, q) {
@@ -151,6 +159,34 @@ function sanitizeQuestions(items) {
 function toInt(v, fallback) {
   const n = parseInt(v, 10);
   return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+function isSingleMode() {
+  const m = els.viewMode.value;
+  return m === 'single' || m === 'single-large' || m === 'omr' || m === 'qa';
+}
+
+function isQaMode() {
+  return els.viewMode.value === 'qa';
+}
+
+function isOmrMode() {
+  return els.viewMode.value === 'omr';
+}
+
+function answerVisibleByDefault() {
+  if (!els.showAnswerToggle) return false;
+  return isQaMode() || !!els.showAnswerToggle.checked;
+}
+
+function toCardClass() {
+  const m = els.viewMode.value;
+  return m === 'single-large' || m === 'omr' || m === 'qa' ? 'singleLargeCard' : '';
+}
+
+function getCurrentModeLabel() {
+  const selected = els.viewMode.options[els.viewMode.selectedIndex];
+  return selected ? selected.text : (els.viewMode.value || 'single');
 }
 
 function fillPresetOptions() {
@@ -257,6 +293,7 @@ function filterQuestions() {
 
 function startTimer(minutes) {
   if (timerHandle) clearInterval(timerHandle);
+  sessionStartAt = Date.now();
   remainingSec = Math.max(1, toInt(minutes, 20)) * 60;
   els.timerPanel.hidden = false;
   renderTimer();
@@ -326,7 +363,7 @@ function updateStatusAndStats() {
   const { right, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
 
-  if (els.viewMode.value === 'single') {
+  if (isSingleMode()) {
     setStatus(`문항 ${Math.min(currentIndex + 1, total)} / ${total} (답안완료 ${answered}개)`);
   } else {
     setStatus(`문항 ${total} / ${total} (답안완료 ${answered}개)`);
@@ -419,7 +456,7 @@ function gradeOne(index, key, q, card, optionsWrap, shouldCheck) {
   renderStats();
   syncPresetState();
 
-  if (els.viewMode.value === 'single' && inTest && els.autoNext.checked && index < sessionQuestions.length - 1) {
+  if (isSingleMode() && inTest && els.autoNext.checked && index < sessionQuestions.length - 1) {
     setTimeout(() => goNext(), 250);
   }
 }
@@ -427,6 +464,7 @@ function gradeOne(index, key, q, card, optionsWrap, shouldCheck) {
 function makeCard(q, index, total) {
   const card = document.createElement('section');
   card.className = 'card';
+  const mode = els.viewMode.value;
   const key = qKeyFor(index, q);
   card.dataset.qid = key;
 
@@ -434,6 +472,7 @@ function makeCard(q, index, total) {
   h3.textContent = `문항 ${index + 1} / ${total} - ${q.id || 'NoID'} (${q.category || '토목기사'} / ${q.difficulty || '-'})`;
 
   const qText = document.createElement('p');
+  qText.className = 'questionText';
   qText.textContent = q.question || '문항이 없습니다.';
 
   const mediaWrap = document.createElement('figure');
@@ -472,6 +511,7 @@ function makeCard(q, index, total) {
       updateStatusAndStats();
       renderStats();
       syncPresetState();
+      renderOmrSheet();
     });
     optionsWrap.appendChild(input);
   } else {
@@ -491,6 +531,7 @@ function makeCard(q, index, total) {
         updateStatusAndStats();
         renderStats();
         syncPresetState();
+        renderOmrSheet();
       });
       optionsWrap.appendChild(btn);
     });
@@ -507,6 +548,34 @@ function makeCard(q, index, total) {
   btnReveal.textContent = '정답 보기';
   btnReveal.addEventListener('click', () => gradeOne(index, key, q, card, optionsWrap, false));
 
+  const state = gradedMeta.get(key);
+  let answerVisible = isQaMode() || answerVisibleByDefault() || !!state;
+  const btnToggle = document.createElement('button');
+  btnToggle.type = 'button';
+  btnToggle.textContent = answerVisible ? '정답/해설 숨기기' : '정답/해설 보기';
+
+  const answerBlock = document.createElement('div');
+  answerBlock.className = 'answerBlock';
+  answerBlock.hidden = !answerVisible;
+  const ansText = document.createElement('p');
+  ansText.className = 'short-answer';
+  ansText.textContent = `정답: ${q.answer || '-'}`;
+  const expText = document.createElement('p');
+  expText.textContent = `해설: ${q.explanation || '해설 없음'}`;
+  if (isQaMode() && q.type === 'multiple') {
+    answerBlock.append(ansText, expText);
+  } else if (isQaMode() || answerVisibleByDefault()) {
+    answerBlock.append(ansText, expText);
+  } else {
+    answerBlock.append(expText);
+  }
+
+  btnToggle.addEventListener('click', () => {
+    answerVisible = !answerVisible;
+    answerBlock.hidden = !answerVisible;
+    btnToggle.textContent = answerVisible ? '정답/해설 숨기기' : '정답/해설 보기';
+  });
+
   const btnClear = document.createElement('button');
   btnClear.textContent = '문항초기화';
   btnClear.addEventListener('click', () => {
@@ -520,16 +589,20 @@ function makeCard(q, index, total) {
     syncPresetState();
   });
 
-  actions.append(btnCheck, btnReveal, btnClear);
+  actions.append(btnCheck, btnReveal, btnToggle, btnClear);
 
   if (mediaWrap.children.length) {
-    card.append(h3, qText, mediaWrap, optionsWrap, actions);
+    card.append(h3, qText, mediaWrap, optionsWrap, actions, answerBlock);
   } else {
-    card.append(h3, qText, optionsWrap, actions);
+    card.append(h3, qText, optionsWrap, actions, answerBlock);
   }
 
-  const state = gradedMeta.get(key);
-  if (state) applyGradeVisual(q, key, card, optionsWrap, state.isCorrect);
+  const cardModeClass = toCardClass();
+  if (cardModeClass) card.classList.add(cardModeClass);
+
+  const existing = gradedMeta.get(key);
+  if (existing) applyGradeVisual(q, key, card, optionsWrap, existing.isCorrect);
+
   return card;
 }
 
@@ -537,6 +610,7 @@ function renderSingle() {
   if (!sessionQuestions.length) {
     els.quizArea.innerHTML = '<div class="card">문제가 없습니다.</div>';
     els.singleNav.hidden = true;
+    if (els.omrPanel) els.omrPanel.hidden = true;
     setStatus('문항 0 / 0');
     return;
   }
@@ -546,8 +620,16 @@ function renderSingle() {
   const card = makeCard(q, currentIndex, sessionQuestions.length);
   els.quizArea.appendChild(card);
 
-  els.singlePos.textContent = `${currentIndex + 1} / ${sessionQuestions.length}`;
-  els.singleNav.hidden = false;
+  if (isOmrMode()) {
+    els.singlePos.textContent = `${currentIndex + 1} / ${sessionQuestions.length} (OMR)`;
+    els.singleNav.hidden = false;
+    if (els.omrPanel) els.omrPanel.hidden = false;
+    renderOmrSheet();
+  } else {
+    els.singlePos.textContent = `${currentIndex + 1} / ${sessionQuestions.length}`;
+    if (els.omrPanel) els.omrPanel.hidden = true;
+    els.singleNav.hidden = false;
+  }
 
   updateStatusAndStats();
   renderStats();
@@ -556,15 +638,22 @@ function renderSingle() {
 function renderAll() {
   els.quizArea.innerHTML = '';
   sessionQuestions.forEach((q, idx) => {
-    els.quizArea.appendChild(makeCard(q, idx, sessionQuestions.length));
+    const card = makeCard(q, idx, sessionQuestions.length);
+    card.classList.add('singleLargeCard');
+    if (!answerVisibleByDefault() && !isQaMode()) {
+      const block = card.querySelector('.answerBlock');
+      if (block) block.hidden = true;
+    }
+    els.quizArea.appendChild(card);
   });
+  if (els.omrPanel) els.omrPanel.hidden = true;
   els.singleNav.hidden = true;
   updateStatusAndStats();
   renderStats();
 }
 
 function renderSession() {
-  if (els.viewMode.value === 'single') renderSingle();
+  if (isSingleMode()) renderSingle();
   else renderAll();
 }
 
@@ -639,7 +728,24 @@ function computeFinalResult({ auto = false } = {}) {
   stopTimer();
   const { right, total, wrong } = evaluateSessionScore();
   const percent = total ? Math.round((right / total) * 100) : 0;
+  const elapsed = sessionStartAt ? Math.max(0, Math.floor((Date.now() - sessionStartAt) / 1000)) : 0;
+  const record = {
+    at: new Date().toISOString(),
+    total,
+    right,
+    wrong,
+    percent,
+    elapsedSec: elapsed,
+    category: els.examCategory.value,
+    difficulty: els.difficultySelect.value,
+    mode: els.modeSelect.value,
+    viewMode: els.viewMode.value,
+    title: getCurrentModeLabel(),
+    maxCount: toInt(els.maxCount.value, 0),
+    timeLimitMin: toInt(els.timeLimitMin.value, 20)
+  };
   if (auto) alert('시간 종료! 자동 채점합니다.');
+  saveScoreRecord(record);
   els.scoreText.textContent = `최종 점수: ${right} / ${total} (${percent}%), 오답 ${wrong}개`;
   renderStats();
   revealWrongPanel();
@@ -655,13 +761,84 @@ function getCurrentCardContext() {
   return els.quizArea.querySelector('.card');
 }
 
+function renderOmrSheet() {
+  if (!els.omrGrid) return;
+  if (els.viewMode.value !== 'omr') {
+    els.omrGrid.innerHTML = '';
+    return;
+  }
+
+  els.omrGrid.innerHTML = '';
+  sessionQuestions.forEach((q, idx) => {
+    const key = qKeyFor(idx, q);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'omrCell';
+    btn.textContent = `${idx + 1}`;
+
+    const isActive = idx === currentIndex;
+    const hasAnswer = answerMeta.has(key);
+    const isWrong = wrongIds.has(key);
+
+    if (isActive) btn.classList.add('current');
+    if (isWrong) btn.classList.add('wrong');
+    else if (hasAnswer) btn.classList.add('answered');
+
+    btn.addEventListener('click', () => {
+      currentIndex = idx;
+      renderSingle();
+    });
+
+    els.omrGrid.appendChild(btn);
+  });
+}
+
+function saveScoreRecord(row) {
+  const list = loadScoreHistory();
+  list.unshift(row);
+  scoreHistory = list.slice(0, 30);
+  localStorage.setItem(STORAGE.scoreHistory, JSON.stringify(scoreHistory));
+  renderScoreHistory();
+}
+
+function loadScoreHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE.scoreHistory);
+    scoreHistory = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw) : [];
+  } catch {
+    scoreHistory = [];
+  }
+  return scoreHistory;
+}
+
+function renderScoreHistory() {
+  if (!els.scoreHistoryWrap) return;
+  if (!scoreHistory.length) {
+    els.scoreHistoryWrap.innerHTML = '<p class="muted">성적 기록이 없습니다.</p>';
+    return;
+  }
+
+  const rows = scoreHistory.slice(0, 12).map((r) => {
+    const elapsed = r.elapsedSec || 0;
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const ss = String(elapsed % 60).padStart(2, '0');
+    const d = r.at ? new Date(r.at).toLocaleString('ko-KR') : '-';
+    return `<div class="scoreItem">
+      <div><strong>${d}</strong> · ${r.title}</div>
+      <div>정답 ${r.right}/${r.total} (${r.percent}%) / 오답 ${r.wrong} / 시간 ${mm}:${ss}</div>
+    </div>`;
+  }).join('');
+
+  els.scoreHistoryWrap.innerHTML = `<div class="scoreList">${rows}</div>`;
+}
+
 function bindKeyboardShortcuts(e) {
   const activeTag = document.activeElement?.tagName?.toLowerCase();
   if (['input', 'textarea', 'select', 'button'].includes(activeTag)) {
     return;
   }
 
-  if (els.viewMode.value !== 'single') return;
+  if (!isSingleMode()) return;
   const card = getCurrentCardContext();
   if (!card) return;
 
@@ -757,6 +934,10 @@ els.viewMode.addEventListener('change', () => {
 els.maxCount.addEventListener('change', markPresetCustom);
 els.timeLimitMin.addEventListener('change', markPresetCustom);
 els.autoNext.addEventListener('change', markPresetCustom);
+els.showAnswerToggle.addEventListener('change', () => {
+  renderSession();
+  renderOmrSheet();
+});
 els.btnRetryWrong.addEventListener('click', () => {
   if (!wrongIds.size) {
     alert('오답 문제가 없습니다.');
@@ -807,6 +988,13 @@ els.fileJson.addEventListener('change', async (e) => {
   }
 });
 
+els.btnClearScore.addEventListener('click', () => {
+  if (!confirm('성적 기록을 초기화할까요?')) return;
+  scoreHistory = [];
+  localStorage.removeItem(STORAGE.scoreHistory);
+  renderScoreHistory();
+});
+
 els.btnSaveToLocal.addEventListener('click', () => {
   localStorage.setItem(STORAGE.backup, JSON.stringify(allQuestions));
   alert('현재 문제를 로컬에 저장했습니다.');
@@ -834,6 +1022,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   loadPreset();
+  loadScoreHistory();
+  renderScoreHistory();
 
   if (!allQuestions.length) await loadDefault();
   else {
