@@ -161,6 +161,18 @@ npm run ocr:precision -- <이미지경로> --id T014  # 멀티 패스 정밀 모
 - 채점/복기/복사 동작 확인
 
 
+
+### OCR 검수 전용 웹 화면
+- OCR 파이프라인 후 생성된 `review-queue.json`을 브라우저 UI로 빠르게 점검 가능
+- 새 파일: `review.html`
+- 실행 방법:
+  1. `npm run start`
+  2. `http://127.0.0.1:8000/review.html`
+  3. 좌측에서 `review-queue.json` 업로드 또는 기본 경로(`templates/ocr-extract.json`) 로드
+  4. 항목별 문제/보기/정답/해설 보정 후 `승인` 처리
+  5. `검수 큐 저장` 또는 `data.json 병합 저장`으로 결과 내려받기
+  6. 병합된 `data-merged-*.json`을 `chomok-exam-webapp`에 반영(수동 교체)
+
 ## 반자동 검수(문제은행) 워크플로우(MVP)
 - 1단계: `npm run ocr:fast -- <이미지경로> --id T099 ...` 로 초안 JSON 생성
 - 2단계: `npm run review:queue -- --in templates/ocr-extract.json --out templates/review-queue.json` 로 검수 큐 생성

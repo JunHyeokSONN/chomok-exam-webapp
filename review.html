@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>문제 검수 웹앱 | 토목기사 기출문제</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .reviewWrap {
+        width: min(1200px, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
+        margin: 0 auto;
+      }
+
+      .reviewToolbar {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        background: #11131a;
+        border: 1px solid #2d3440;
+        border-radius: 12px;
+        padding: 0.8rem;
+        margin-bottom: 0.8rem;
+      }
+
+      .reviewList {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .reviewCard {
+        background: #171a23;
+        border: 1px solid #2a2f3a;
+        border-radius: 12px;
+        padding: 1rem;
+      }
+
+      .reviewHeader {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.93rem;
+        color: var(--muted);
+      }
+
+      .reviewStatus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target);
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+        border: 1px solid #2d3440;
+        font-weight: 700;
+        color: #d9e1ff;
+      }
+
+      .reviewStatus[data-status="approved"] { background: #1f3a28; color: #9bf5b8; border-color: #2c6b3c; }
+      .reviewStatus[data-status="rejected"] { background: #3b1f24; color: #ff9396; border-color: #7a2c35; }
+      .reviewStatus[data-status="pending"] { background: #2c3a45; color: #d6deff; border-color: #3c4d62; }
+
+      .fieldGrid {
+        display: grid;
+        gap: 0.45rem;
+        margin-top: 0.6rem;
+      }
+
+      .fieldGrid label {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .fieldGrid textarea,
+      .fieldGrid input,
+      .fieldGrid select {
+        width: 100%;
+      }
+
+      .summary {
+        background: #141822;
+        border: 1px solid #2d3440;
+        border-radius: 12px;
+        padding: 0.8rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .summary strong { color: #fff; }
+
+      .actionsRow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0.75rem 0 1rem;
+      }
+
+      .actionsRow button,
+      .reviewToolbar input[type="file"],
+      .reviewToolbar button,
+      .reviewToolbar select {
+        width: auto;
+        min-width: 150px;
+      }
+
+      .metaPreview {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      details {
+        margin-top: 0.5rem;
+      }
+
+      details summary {
+        cursor: pointer;
+        color: #b9d0ff;
+      }
+
+      .miniFigure {
+        margin: 0.45rem 0;
+      }
+
+      .miniFigure img {
+        max-width: 100%;
+        max-height: 220px;
+        border-radius: 8px;
+        border: 1px solid #2d3440;
+      }
+
+      @media (max-width: 640px) {
+        .reviewToolbar { grid-template-columns: 1fr 1fr; }
+        .actionsRow button,
+        .reviewToolbar input[type="file"],
+        .reviewToolbar button,
+        .reviewToolbar select { min-width: 140px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap reviewWrap">
+      <header>
+        <h1>문제 검수 웹앱</h1>
+        <p>OCR 초안(이미지/수식 포함) → 수동 검수 → data.json 병합 후보 생성</p>
+      </header>
+
+      <nav class="importWrap">
+        <div class="summary" id="summary">
+          배치 정보가 없습니다.
+        </div>
+
+        <div class="reviewToolbar">
+          <div>
+            <label for="queueFile">review-queue JSON 로드</label>
+            <input id="queueFile" type="file" accept="application/json,.json" />
+          </div>
+          <div>
+            <label for="dataFile">현재 data.json 로드(선택)</label>
+            <input id="dataFile" type="file" accept="application/json,.json" />
+          </div>
+          <div>
+            <label for="queueFetch">기본 경로 로드</label>
+            <select id="queueFetch">
+              <option value="templates/review-queue.json">templates/review-queue.json</option>
+              <option value="templates/ocr-extract.json">templates/ocr-extract.json</option>
+            </select>
+            <button id="btnLoadFetch">불러오기</button>
+          </div>
+          <div>
+            <label for="statusFilter">전체 상태</label>
+            <select id="statusFilter">
+              <option value="all">전체</option>
+              <option value="pending">대기중만</option>
+              <option value="approved">승인만</option>
+              <option value="rejected">반려만</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actionsRow">
+          <button id="btnApproveAll">대기중 전부 승인</button>
+          <button id="btnRejectAll">대기중 전부 반려</button>
+          <button id="btnExportQueue">검수 큐 저장</button>
+          <button id="btnExportData">data.json 병합 저장</button>
+        </div>
+      </nav>
+
+      <main>
+        <div id="reviewList" class="reviewList"></div>
+      </main>
+
+      <section class="importWrap">
+        <p style="margin:0 0 0.5rem">빠른 이동: <a href="./index.html">문제풀이 화면</a></p>
+      </section>
+    </div>
+
+    <script src="review.js"></script>
+  </body>
+</html>
